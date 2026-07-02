@@ -32,7 +32,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
         working-directory: ./backend
@@ -42,6 +42,7 @@ jobs:
       - name: Run migrations
         working-directory: ./backend
         env:
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
           DB_NAME: test_packetlab_db
           DB_USER: postgres
           DB_PASSWORD: postgres
@@ -53,6 +54,7 @@ jobs:
       - name: Run pytest
         working-directory: ./backend
         env:
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
           DB_NAME: test_packetlab_db
           DB_USER: postgres
           DB_PASSWORD: postgres
@@ -60,4 +62,3 @@ jobs:
           DB_PORT: 5432
         run: |
           pytest
-          
