@@ -5,6 +5,10 @@ from rest_framework.response import Response
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.generics import ListAPIView, RetrieveAPIView
+from rest_framework.permissions import IsAuthenticated
+from .models import Lab
+from .serializers import LabListSerializer, LabDetailSerializer
 
 
 @api_view(['POST'])
@@ -66,3 +70,14 @@ def logout_view(request):
         return Response({'message': 'Logged out successfully.'}, status=status.HTTP_200_OK)
     except Exception:
         return Response({'error': 'Invalid or missing refresh token.'}, status=status.HTTP_400_BAD_REQUEST)
+    
+class LabListView(ListAPIView):
+    queryset = Lab.objects.filter(is_published=True)
+    serializer_class = LabListSerializer
+    permission_classes = [IsAuthenticated]
+
+
+class LabDetailView(RetrieveAPIView):
+    queryset = Lab.objects.filter(is_published=True)
+    serializer_class = LabDetailSerializer
+    permission_classes = [IsAuthenticated]
