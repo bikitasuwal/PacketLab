@@ -1,7 +1,7 @@
 import pytest
 from rest_framework.test import APIClient
 from django.contrib.auth.models import User
-from core.models import Lab, Packet
+from core.models import Lab, Packet, Attempt, Progress
 
 @pytest.fixture
 def api_client():
@@ -180,3 +180,87 @@ def test_lab_detail_includes_packets(authenticated_client):
 def test_lab_detail_not_found(authenticated_client):
     response = authenticated_client.get('/api/labs/9999/')
     assert response.status_code == 404
+
+@pytest.mark.django_db
+def test_submit_correct_answer(authenticated_client):
+    lab = Lab.objects.create(
+        title='Submit Test Lab', topic='TCP', difficulty='Beginner',
+        pcap_file='pcaps/test.pcap', challenge_question='Q?',
+        correct_answer='Packet 2', is_published=True
+    )
+
+    response = authenticated_client.post(f'/api/labs/{lab.id}/submit/', {
+        'answer': 'Packet 2'
+    })
+    assert response.status_code == 200
+    assert response.data['is_correct'] is True
+
+
+@pytest.mark.django_db
+def test_submit_incorrect_answer(authenticated_client):
+    lab = Lab.objects.create(
+        title='Submit Test Lab 2', topic='TCP', difficulty='Beginner',
+        pcap_file='pcaps/test.pcap', challenge_question='Q?',
+        correct_answer='Packet 2', is_published=True
+    )
+
+    response = authenticated_client.post(f'/api/labs/{lab.id}/submit/', {
+        'answer': 'Packet 1'
+    })
+    assert response.status_code == 200
+    assert response.data['is_correct'] is False
+    assert response.data['correct_answer'] == 'Packet 2'
+
+
+@pytest.mark.django_db
+def test_submit_empty_answer_rejected(authenticated_client):
+    lab = Lab.objects.create(
+        title='Submit Test Lab 3', topic='TCP', difficulty='Beginner',
+        pcap_file='pcaps/test.pcap', challenge_question='Q?',
+        correct_answer='Packet 2', is_published=True
+    )
+
+    response = authenticated_client.post(f'/api/labs/{lab.id}/submit/', {
+        'answer': ''
+    })
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_submit_creates_attempt_record(authenticated_client):
+    lab = Lab.objects.create(
+        title='Submit Test Lab 4', topic='TCP', difficulty='Beginner',
+        pcap_file='pcaps/test.pcap', challenge_question='Q?',
+        correct_answer='Packet 2', is_published=True
+    )
+
+    authenticated_client.post(f'/api/labs/{lab.id}/submit/', {'answer': 'Packet 2'})
+
+    assert Attempt.objects.filter(lab=lab, is_correct=True).count() == 1
+
+
+@pytest.mark.django_db
+def test_submit_updates_progress_on_correct(authenticated_client):
+    lab = Lab.objects.create(
+        title='Submit Test Lab 5', topic='TCP', difficulty='Beginner',
+        pcap_file='pcaps/test.pcap', challenge_question='Q?',
+        correct_answer='Packet 2', is_published=True
+    )
+
+    authenticated_client.post(f'/api/labs/{lab.id}/submit/', {'answer': 'Packet 2'})
+
+    user = User.objects.get(username='labtester')
+    progress = Progress.objects.get(student=user)
+    assert progress.labs_completed == 1
+
+
+@pytest.mark.django_db
+def test_submit_requires_auth(api_client):
+    lab = Lab.objects.create(
+        title='Submit Test Lab 6', topic='TCP', difficulty='Beginner',
+        pcap_file='pcaps/test.pcap', challenge_question='Q?',
+        correct_answer='Packet 2', is_published=True
+    )
+
+    response = api_client.post(f'/api/labs/{lab.id}/submit/', {'answer': 'Packet 2'})
+    assert response.status_code == 401
