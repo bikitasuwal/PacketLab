@@ -83,3 +83,31 @@ def test_logout_without_token(api_client):
         'refresh': 'sometoken'
     })
     assert response.status_code == 401
+
+@pytest.mark.django_db
+def test_dummy_users_can_login(api_client):
+    dummy_users = [
+        ('user1', 'zxcvbnm,./'),
+        ('user2', 'zxcvbnm,./'),
+    ]
+
+    for username, password in dummy_users:
+        User.objects.create_user(username=username, password=password)
+
+        login_response = api_client.post('/api/auth/login/', {
+            'username': username,
+            'password': password
+        })
+        assert login_response.status_code == 200
+        assert 'access' in login_response.data
+
+        access_token = login_response.data['access']
+        refresh_token = login_response.data['refresh']
+
+        api_client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
+        logout_response = api_client.post('/api/auth/logout/', {
+            'refresh': refresh_token
+        })
+        assert logout_response.status_code == 200
+
+        api_client.credentials()  # clear auth for next loop iteration
