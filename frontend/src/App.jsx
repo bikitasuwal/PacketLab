@@ -1,19 +1,41 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import Login from './pages/Login';
+import LabList from './pages/LabList';
+import LabDetail from './pages/LabDetail';
 
-function App() {
-  const [count, setCount] = useState(0)
-
-  return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-      <h1 className="text-4xl font-bold text-white">
-        PacketLab 🚀
-      </h1>
-    </div>
-  )
+function isAuthenticated() {
+  return !!localStorage.getItem('access_token');
 }
 
-export default App
+function ProtectedRoute({ children }) {
+  return isAuthenticated() ? children : <Navigate to="/login" />;
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route
+          path="/labs"
+          element={
+            <ProtectedRoute>
+              <LabList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/labs/:id"
+          element={
+            <ProtectedRoute>
+              <LabDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/" element={<Navigate to="/labs" />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+export default App;
