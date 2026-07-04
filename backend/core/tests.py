@@ -1,12 +1,27 @@
 import pytest
 from rest_framework.test import APIClient
 from django.contrib.auth.models import User
-from core.models import Lab, Packet, Attempt, Progress
+from core.models import Lab, Packet, Challenge, Attempt, Progress
+
 
 @pytest.fixture
 def api_client():
     return APIClient()
 
+
+@pytest.fixture
+def authenticated_client(api_client):
+    user = User.objects.create_user(username='labtester', password='testpass123')
+    login_response = api_client.post('/api/auth/login/', {
+        'username': 'labtester',
+        'password': 'testpass123'
+    })
+    access_token = login_response.data['access']
+    api_client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
+    return api_client
+
+
+# ---------- Auth tests ----------
 
 @pytest.mark.django_db
 def test_register_success(api_client):
@@ -63,7 +78,7 @@ def test_login_invalid_credentials(api_client):
 
 @pytest.mark.django_db
 def test_logout_success(api_client):
-    user = User.objects.create_user(username='logoutuser', password='pass123')
+    User.objects.create_user(username='logoutuser', password='pass123')
     login_response = api_client.post('/api/auth/login/', {
         'username': 'logoutuser',
         'password': 'pass123'
@@ -72,59 +87,45 @@ def test_logout_success(api_client):
     refresh_token = login_response.data['refresh']
 
     api_client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
-    response = api_client.post('/api/auth/logout/', {
-        'refresh': refresh_token
-    })
+    response = api_client.post('/api/auth/logout/', {'refresh': refresh_token})
     assert response.status_code == 200
 
 
 @pytest.mark.django_db
 def test_logout_without_token(api_client):
-    response = api_client.post('/api/auth/logout/', {
-        'refresh': 'sometoken'
-    })
+    response = api_client.post('/api/auth/logout/', {'refresh': 'sometoken'})
     assert response.status_code == 401
+
 
 @pytest.mark.django_db
 def test_dummy_users_can_login(api_client):
     dummy_users = [
-        ('user1', 'zxcvbnm,./'),
-        ('user2', 'zxcvbnm,./'),
+        ('priya_s', 'pass12345'),
+        ('rahul_k', 'pass12345'),
+        ('sneha_t', 'pass12345'),
+        ('arjun_m', 'pass12345'),
+        ('kabin_r', 'pass12345'),
     ]
 
     for username, password in dummy_users:
         User.objects.create_user(username=username, password=password)
 
         login_response = api_client.post('/api/auth/login/', {
-            'username': username,
-            'password': password
+            'username': username, 'password': password
         })
         assert login_response.status_code == 200
-        assert 'access' in login_response.data
 
         access_token = login_response.data['access']
         refresh_token = login_response.data['refresh']
 
         api_client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
-        logout_response = api_client.post('/api/auth/logout/', {
-            'refresh': refresh_token
-        })
+        logout_response = api_client.post('/api/auth/logout/', {'refresh': refresh_token})
         assert logout_response.status_code == 200
 
-        api_client.credentials()  # clear auth for next loop iteration
+        api_client.credentials()
 
 
-@pytest.fixture
-def authenticated_client(api_client):
-    user = User.objects.create_user(username='labtester', password='testpass123')
-    login_response = api_client.post('/api/auth/login/', {
-        'username': 'labtester',
-        'password': 'testpass123'
-    })
-    access_token = login_response.data['access']
-    api_client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
-    return api_client
-
+# ---------- Lab / Packet tests ----------
 
 @pytest.mark.django_db
 def test_lab_list_requires_auth(api_client):
@@ -136,13 +137,11 @@ def test_lab_list_requires_auth(api_client):
 def test_lab_list_returns_published_labs(authenticated_client):
     Lab.objects.create(
         title='Test Lab 1', topic='TCP', difficulty='Beginner',
-        pcap_file='pcaps/test1.pcap', challenge_question='Q1?',
-        correct_answer='A1', is_published=True
+        pcap_file='pcaps/test1.pcap', is_published=True
     )
     Lab.objects.create(
         title='Test Lab 2 (draft)', topic='DNS', difficulty='Beginner',
-        pcap_file='pcaps/test2.pcap', challenge_question='Q2?',
-        correct_answer='A2', is_published=False
+        pcap_file='pcaps/test2.pcap', is_published=False
     )
 
     response = authenticated_client.get('/api/labs/')
@@ -152,28 +151,26 @@ def test_lab_list_returns_published_labs(authenticated_client):
 
 
 @pytest.mark.django_db
-def test_lab_detail_includes_packets(authenticated_client):
+def test_lab_detail_includes_packets_and_challenges(authenticated_client):
     lab = Lab.objects.create(
         title='Handshake Lab', topic='TCP', difficulty='Beginner',
-        pcap_file='pcaps/handshake.pcap', challenge_question='Which is SYN-ACK?',
-        correct_answer='Packet 2', is_published=True
+        pcap_file='pcaps/handshake.pcap', is_published=True
     )
     Packet.objects.create(
         lab=lab, packet_number=1, source_ip='192.168.1.5',
         dest_ip='93.184.216.34', protocol='TCP', flags='SYN',
         summary='Client requests connection'
     )
-    Packet.objects.create(
-        lab=lab, packet_number=2, source_ip='93.184.216.34',
-        dest_ip='192.168.1.5', protocol='TCP', flags='SYN, ACK',
-        summary='Server acknowledges'
+    Challenge.objects.create(
+        lab=lab, order=1, question='Which packet is SYN?',
+        correct_answer='Packet 1'
     )
 
     response = authenticated_client.get(f'/api/labs/{lab.id}/')
     assert response.status_code == 200
-    assert response.data['title'] == 'Handshake Lab'
-    assert len(response.data['packets']) == 2
-    assert 'correct_answer' not in response.data  # answer key must never leak
+    assert len(response.data['packets']) == 1
+    assert len(response.data['challenges']) == 1
+    assert 'correct_answer' not in response.data['challenges'][0]
 
 
 @pytest.mark.django_db
@@ -181,15 +178,20 @@ def test_lab_detail_not_found(authenticated_client):
     response = authenticated_client.get('/api/labs/9999/')
     assert response.status_code == 404
 
+
+# ---------- Challenge submission tests ----------
+
 @pytest.mark.django_db
 def test_submit_correct_answer(authenticated_client):
     lab = Lab.objects.create(
         title='Submit Test Lab', topic='TCP', difficulty='Beginner',
-        pcap_file='pcaps/test.pcap', challenge_question='Q?',
-        correct_answer='Packet 2', is_published=True
+        pcap_file='pcaps/test.pcap', is_published=True
+    )
+    challenge = Challenge.objects.create(
+        lab=lab, order=1, question='Q?', correct_answer='Packet 2'
     )
 
-    response = authenticated_client.post(f'/api/labs/{lab.id}/submit/', {
+    response = authenticated_client.post(f'/api/challenges/{challenge.id}/submit/', {
         'answer': 'Packet 2'
     })
     assert response.status_code == 200
@@ -200,11 +202,13 @@ def test_submit_correct_answer(authenticated_client):
 def test_submit_incorrect_answer(authenticated_client):
     lab = Lab.objects.create(
         title='Submit Test Lab 2', topic='TCP', difficulty='Beginner',
-        pcap_file='pcaps/test.pcap', challenge_question='Q?',
-        correct_answer='Packet 2', is_published=True
+        pcap_file='pcaps/test.pcap', is_published=True
+    )
+    challenge = Challenge.objects.create(
+        lab=lab, order=1, question='Q?', correct_answer='Packet 2'
     )
 
-    response = authenticated_client.post(f'/api/labs/{lab.id}/submit/', {
+    response = authenticated_client.post(f'/api/challenges/{challenge.id}/submit/', {
         'answer': 'Packet 1'
     })
     assert response.status_code == 200
@@ -216,11 +220,13 @@ def test_submit_incorrect_answer(authenticated_client):
 def test_submit_empty_answer_rejected(authenticated_client):
     lab = Lab.objects.create(
         title='Submit Test Lab 3', topic='TCP', difficulty='Beginner',
-        pcap_file='pcaps/test.pcap', challenge_question='Q?',
-        correct_answer='Packet 2', is_published=True
+        pcap_file='pcaps/test.pcap', is_published=True
+    )
+    challenge = Challenge.objects.create(
+        lab=lab, order=1, question='Q?', correct_answer='Packet 2'
     )
 
-    response = authenticated_client.post(f'/api/labs/{lab.id}/submit/', {
+    response = authenticated_client.post(f'/api/challenges/{challenge.id}/submit/', {
         'answer': ''
     })
     assert response.status_code == 400
@@ -230,27 +236,35 @@ def test_submit_empty_answer_rejected(authenticated_client):
 def test_submit_creates_attempt_record(authenticated_client):
     lab = Lab.objects.create(
         title='Submit Test Lab 4', topic='TCP', difficulty='Beginner',
-        pcap_file='pcaps/test.pcap', challenge_question='Q?',
-        correct_answer='Packet 2', is_published=True
+        pcap_file='pcaps/test.pcap', is_published=True
+    )
+    challenge = Challenge.objects.create(
+        lab=lab, order=1, question='Q?', correct_answer='Packet 2'
     )
 
-    authenticated_client.post(f'/api/labs/{lab.id}/submit/', {'answer': 'Packet 2'})
+    authenticated_client.post(f'/api/challenges/{challenge.id}/submit/', {'answer': 'Packet 2'})
 
-    assert Attempt.objects.filter(lab=lab, is_correct=True).count() == 1
+    assert Attempt.objects.filter(challenge=challenge, is_correct=True).count() == 1
 
 
 @pytest.mark.django_db
-def test_submit_updates_progress_on_correct(authenticated_client):
+def test_submit_updates_progress_only_when_lab_fully_complete(authenticated_client):
     lab = Lab.objects.create(
         title='Submit Test Lab 5', topic='TCP', difficulty='Beginner',
-        pcap_file='pcaps/test.pcap', challenge_question='Q?',
-        correct_answer='Packet 2', is_published=True
+        pcap_file='pcaps/test.pcap', is_published=True
     )
+    challenge1 = Challenge.objects.create(lab=lab, order=1, question='Q1?', correct_answer='A1')
+    challenge2 = Challenge.objects.create(lab=lab, order=2, question='Q2?', correct_answer='A2')
 
-    authenticated_client.post(f'/api/labs/{lab.id}/submit/', {'answer': 'Packet 2'})
-
+    # Answer only the first challenge correctly — lab not fully complete yet
+    authenticated_client.post(f'/api/challenges/{challenge1.id}/submit/', {'answer': 'A1'})
     user = User.objects.get(username='labtester')
     progress = Progress.objects.get(student=user)
+    assert progress.labs_completed == 0
+
+    # Answer the second challenge correctly — NOW the lab is fully complete
+    authenticated_client.post(f'/api/challenges/{challenge2.id}/submit/', {'answer': 'A2'})
+    progress.refresh_from_db()
     assert progress.labs_completed == 1
 
 
@@ -258,9 +272,24 @@ def test_submit_updates_progress_on_correct(authenticated_client):
 def test_submit_requires_auth(api_client):
     lab = Lab.objects.create(
         title='Submit Test Lab 6', topic='TCP', difficulty='Beginner',
-        pcap_file='pcaps/test.pcap', challenge_question='Q?',
-        correct_answer='Packet 2', is_published=True
+        pcap_file='pcaps/test.pcap', is_published=True
     )
+    challenge = Challenge.objects.create(lab=lab, order=1, question='Q?', correct_answer='A')
 
-    response = api_client.post(f'/api/labs/{lab.id}/submit/', {'answer': 'Packet 2'})
+    response = api_client.post(f'/api/challenges/{challenge.id}/submit/', {'answer': 'A'})
     assert response.status_code == 401
+
+
+# ---------- Progress tests ----------
+
+@pytest.mark.django_db
+def test_progress_requires_auth(api_client):
+    response = api_client.get('/api/progress/')
+    assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_progress_creates_default_if_none_exists(authenticated_client):
+    response = authenticated_client.get('/api/progress/')
+    assert response.status_code == 200
+    assert response.data['labs_completed'] == 0

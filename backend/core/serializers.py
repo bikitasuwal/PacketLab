@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Lab, Packet
+from .models import Lab, Packet, Challenge
 
 
 class PacketSerializer(serializers.ModelSerializer):
@@ -11,24 +11,26 @@ class PacketSerializer(serializers.ModelSerializer):
         ]
 
 
+class ChallengeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Challenge
+        fields = ['id', 'order', 'question']
+        # correct_answer intentionally excluded — never leak the answer key
+
+
 class LabListSerializer(serializers.ModelSerializer):
-    """Lightweight version — used for the browse/list page, no packets included"""
     class Meta:
         model = Lab
-        fields = [
-            'id', 'title', 'topic', 'difficulty', 'is_published'
-        ]
+        fields = ['id', 'title', 'topic', 'difficulty', 'is_published']
 
 
 class LabDetailSerializer(serializers.ModelSerializer):
-    """Full version — used when opening a single lab, includes everything"""
     packets = PacketSerializer(many=True, read_only=True)
+    challenges = ChallengeSerializer(many=True, read_only=True)
 
     class Meta:
         model = Lab
         fields = [
-            'id', 'title', 'topic', 'difficulty', 'challenge_question',
-            'resources', 'is_published', 'packets'
+            'id', 'title', 'topic', 'difficulty',
+            'resources', 'is_published', 'packets', 'challenges'
         ]
-        # Note: correct_answer is intentionally excluded — 
-        # never send the answer key to the frontend

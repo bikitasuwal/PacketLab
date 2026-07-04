@@ -26,7 +26,15 @@ function LabList() {
 
   return (
     <div className="min-h-screen bg-gray-900 p-8">
-      <h1 className="text-3xl font-bold text-white mb-6">Labs</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-white">Labs</h1>
+        <button
+          onClick={() => navigate('/progress')}
+          className="text-blue-400 hover:underline text-sm"
+        >
+          View Progress
+        </button>
+      </div>
 
       <div className="grid gap-4 max-w-2xl">
         {labs.map((lab) => (

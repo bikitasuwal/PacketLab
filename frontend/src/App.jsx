@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import LabList from './pages/LabList';
 import LabDetail from './pages/LabDetail';
+import Progress from './pages/Progress';
 
 function isAuthenticated() {
   return !!localStorage.getItem('access_token');
@@ -29,6 +30,14 @@ function App() {
           element={
             <ProtectedRoute>
               <LabDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/progress"
+          element={
+            <ProtectedRoute>
+              <Progress />
             </ProtectedRoute>
           }
         />
