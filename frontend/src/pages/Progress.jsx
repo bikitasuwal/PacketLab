@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Activity, Trophy } from 'lucide-react';
 import api from '../api/axios';
+import Layout from '../components/Layout';
 
-function Progress() {
+function ProgressPage() {
   const [progress, setProgress] = useState(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
   useEffect(() => {
     api.get('/progress/')
@@ -14,8 +14,14 @@ function Progress() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) {
-    return <div className="min-h-screen bg-gray-900 text-white p-8">Loading progress...</div>;
+  if (loading || !progress) {
+    return (
+      <Layout>
+        <div className="p-10" style={{ color: 'var(--color-text-dim)' }}>
+          Loading progress...
+        </div>
+      </Layout>
+    );
   }
 
   const percent = progress.total_labs > 0
@@ -23,32 +29,46 @@ function Progress() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-gray-900 p-8">
-      <button
-        onClick={() => navigate('/labs')}
-        className="text-gray-400 hover:text-white mb-6 text-sm"
-      >
-        Back to labs
-      </button>
-
-      <h1 className="text-3xl font-bold text-white mb-6">Your Progress</h1>
-
-      <div className="bg-gray-800 p-6 rounded-lg max-w-md">
-        <p className="text-white text-lg mb-2">
-          {progress.labs_completed} of {progress.total_labs} labs completed
-        </p>
-
-        <div className="w-full bg-gray-700 rounded-full h-3 mb-2">
-          <div
-            className="bg-blue-600 h-3 rounded-full transition-all"
-            style={{ width: `${percent}%` }}
-          />
+    <Layout>
+      <div className="p-10 max-w-md">
+        <div className="flex items-center gap-2 mb-8">
+          <Activity size={20} style={{ color: 'var(--color-accent)' }} />
+          <h1
+            className="text-2xl font-semibold"
+            style={{ fontFamily: 'var(--font-display)', color: 'var(--color-text)' }}
+          >
+            Your Progress
+          </h1>
         </div>
 
-        <p className="text-gray-400 text-sm">{percent}% complete</p>
+        <div
+          className="p-6 rounded-lg border"
+          style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <Trophy size={16} style={{ color: 'var(--color-accent)' }} />
+            <p className="font-mono" style={{ color: 'var(--color-text)' }}>
+              {progress.labs_completed} / {progress.total_labs} labs completed
+            </p>
+          </div>
+
+          <div
+            className="w-full h-2 rounded-full mt-4 mb-2 overflow-hidden"
+            style={{ backgroundColor: 'var(--color-border)' }}
+          >
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{ width: `${percent}%`, backgroundColor: 'var(--color-accent)' }}
+            />
+          </div>
+
+          <p className="text-sm" style={{ color: 'var(--color-text-dim)' }}>
+            {percent}% complete
+          </p>
+        </div>
       </div>
-    </div>
+    </Layout>
   );
 }
 
-export default Progress;
+export default ProgressPage;
