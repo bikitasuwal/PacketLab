@@ -1,8 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, CheckCircle2, XCircle, Loader2, ArrowRight } from 'lucide-react';
+import {
+  ArrowLeft,
+  ExternalLink,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  ArrowRight,
+  Sparkles,
+  List,
+  GitBranch,
+  X,
+} from 'lucide-react';
 import api from '../api/axios';
 import Layout from '../components/Layout';
+import SequenceDiagram from '../components/SequenceDiagram';
 
 const protocolColors = {
   TCP: 'var(--color-tcp)',
@@ -15,10 +27,92 @@ function getProtocolColor(protocol) {
   return protocolColors[protocol] || 'var(--color-text-dim)';
 }
 
+function PacketCard({ packet }) {
+  const [explanation, setExplanation] = useState(null);
+  const [loadingExplain, setLoadingExplain] = useState(false);
+
+  const handleExplain = async () => {
+    setLoadingExplain(true);
+    try {
+      const response = await api.post(`/packets/${packet.id}/explain/`);
+      setExplanation(response.data.explanation);
+    } catch (err) {
+      setExplanation("Couldn't generate an explanation right now. Try again in a moment.");
+    } finally {
+      setLoadingExplain(false);
+    }
+  };
+
+  const color = getProtocolColor(packet.protocol);
+
+  return (
+    <div
+      className="p-2.5 rounded-md border-l-4"
+      style={{ backgroundColor: 'var(--color-bg)', borderLeftColor: color }}
+    >
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="text-xs font-mono w-6 shrink-0" style={{ color: 'var(--color-text-dim)' }}>
+          {packet.packet_number}
+        </span>
+        <span
+          className="text-xs font-mono font-semibold px-2 py-0.5 rounded shrink-0"
+          style={{ color, backgroundColor: `${color}1A` }}
+        >
+          {packet.protocol}
+        </span>
+        <span className="flex items-center gap-1.5 text-sm font-mono shrink-0" style={{ color: 'var(--color-text)' }}>
+          {packet.source_ip}
+          <ArrowRight size={12} style={{ color: 'var(--color-text-dim)' }} />
+          {packet.dest_ip}
+        </span>
+        {packet.flags && (
+          <span className="text-xs font-mono" style={{ color: 'var(--color-text-dim)' }}>
+            [{packet.flags}]
+          </span>
+        )}
+        <span className="text-sm truncate flex-1" style={{ color: 'var(--color-text-dim)' }}>
+          {packet.summary}
+        </span>
+        <button
+          onClick={handleExplain}
+          disabled={loadingExplain}
+          className="flex items-center gap-1 text-xs px-2 py-1 rounded shrink-0 hover:opacity-80"
+          style={{ color: 'var(--color-accent)', backgroundColor: 'rgba(52,211,153,0.1)' }}
+        >
+          {loadingExplain ? (
+            <Loader2 size={11} className="animate-spin" />
+          ) : (
+            <Sparkles size={11} />
+          )}
+          {loadingExplain ? 'Thinking...' : 'Explain'}
+        </button>
+      </div>
+
+      {explanation && (
+  <div
+    className="flex items-start gap-2 mt-2 p-2.5 rounded text-sm"
+    style={{ backgroundColor: 'rgba(52,211,153,0.06)', color: 'var(--color-text)' }}
+  >
+    <Sparkles size={13} className="mt-0.5 shrink-0" style={{ color: 'var(--color-accent)' }} />
+    <span className="flex-1">{explanation}</span>
+    <button
+      onClick={() => setExplanation(null)}
+      className="shrink-0 hover:opacity-70"
+      style={{ color: 'var(--color-text-dim)' }}
+    >
+      <X size={14} />
+    </button>
+  </div>
+)}
+    </div>
+  );
+}
+
 function ChallengeBlock({ challenge }) {
   const [answer, setAnswer] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
+  const [view, setView] = useState('cards');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -41,41 +135,42 @@ function ChallengeBlock({ challenge }) {
       style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
     >
       {challenge.packets.length > 0 && (
-        <div className="flex flex-col gap-2 mb-4">
-          {challenge.packets.map((packet) => {
-            const color = getProtocolColor(packet.protocol);
-            return (
-              <div
-                key={packet.id}
-                className="flex items-center gap-3 p-2.5 rounded-md border-l-4"
-                style={{ backgroundColor: 'var(--color-bg)', borderLeftColor: color }}
-              >
-                <span className="text-xs font-mono w-6 shrink-0" style={{ color: 'var(--color-text-dim)' }}>
-                  {packet.packet_number}
-                </span>
-                <span
-                  className="text-xs font-mono font-semibold px-2 py-0.5 rounded shrink-0"
-                  style={{ color, backgroundColor: `${color}1A` }}
-                >
-                  {packet.protocol}
-                </span>
-                <span className="flex items-center gap-1.5 text-sm font-mono shrink-0" style={{ color: 'var(--color-text)' }}>
-                  {packet.source_ip}
-                  <ArrowRight size={12} style={{ color: 'var(--color-text-dim)' }} />
-                  {packet.dest_ip}
-                </span>
-                {packet.flags && (
-                  <span className="text-xs font-mono" style={{ color: 'var(--color-text-dim)' }}>
-                    [{packet.flags}]
-                  </span>
-                )}
-                <span className="text-sm truncate" style={{ color: 'var(--color-text-dim)' }}>
-                  {packet.summary}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+        <>
+          <div className="flex gap-2 mb-3">
+            <button
+              onClick={() => setView('cards')}
+              className="flex items-center gap-1 text-xs px-2 py-1 rounded"
+              style={{
+                color: view === 'cards' ? 'var(--color-accent)' : 'var(--color-text-dim)',
+                backgroundColor: view === 'cards' ? 'rgba(52,211,153,0.1)' : 'transparent',
+              }}
+            >
+              <List size={12} /> Cards
+            </button>
+            <button
+              onClick={() => setView('diagram')}
+              className="flex items-center gap-1 text-xs px-2 py-1 rounded"
+              style={{
+                color: view === 'diagram' ? 'var(--color-accent)' : 'var(--color-text-dim)',
+                backgroundColor: view === 'diagram' ? 'rgba(52,211,153,0.1)' : 'transparent',
+              }}
+            >
+              <GitBranch size={12} /> Diagram
+            </button>
+          </div>
+
+          {view === 'cards' ? (
+            <div className="flex flex-col gap-2 mb-4">
+              {challenge.packets.map((packet) => (
+                <PacketCard key={packet.id} packet={packet} />
+              ))}
+            </div>
+          ) : (
+            <div className="mb-4">
+              <SequenceDiagram packets={challenge.packets} />
+            </div>
+          )}
+        </>
       )}
 
       <p className="text-sm font-medium mb-3" style={{ color: 'var(--color-text)' }}>
@@ -113,7 +208,11 @@ function ChallengeBlock({ challenge }) {
             color: result.is_correct ? '#34D399' : '#F87171',
           }}
         >
-          {result.is_correct ? <CheckCircle2 size={16} className="mt-0.5 shrink-0" /> : <XCircle size={16} className="mt-0.5 shrink-0" />}
+          {result.is_correct ? (
+            <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
+          ) : (
+            <XCircle size={16} className="mt-0.5 shrink-0" />
+          )}
           <span>{result.message}</span>
         </div>
       )}
@@ -157,7 +256,10 @@ function LabDetail() {
           Back to labs
         </button>
 
-        <h1 className="text-2xl font-semibold mb-1" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-text)' }}>
+        <h1
+          className="text-2xl font-semibold mb-1"
+          style={{ fontFamily: 'var(--font-display)', color: 'var(--color-text)' }}
+        >
           {lab.title}
         </h1>
         <p className="text-sm font-mono mb-6" style={{ color: 'var(--color-text-dim)' }}>
