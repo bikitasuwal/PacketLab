@@ -48,6 +48,7 @@ jobs:
           DB_PASSWORD: postgres
           DB_HOST: localhost
           DB_PORT: 5432
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
           python manage.py migrate
 
@@ -60,5 +61,6 @@ jobs:
           DB_PASSWORD: postgres
           DB_HOST: localhost
           DB_PORT: 5432
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
           pytest
