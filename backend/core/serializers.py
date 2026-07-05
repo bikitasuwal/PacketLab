@@ -12,10 +12,12 @@ class PacketSerializer(serializers.ModelSerializer):
 
 
 class ChallengeSerializer(serializers.ModelSerializer):
+    packets = PacketSerializer(many=True, read_only=True)
+
     class Meta:
         model = Challenge
-        fields = ['id', 'order', 'question']
-        # correct_answer intentionally excluded — never leak the answer key
+        fields = ['id', 'order', 'question', 'packets']
+        # correct_answer intentionally excluded
 
 
 class LabListSerializer(serializers.ModelSerializer):
@@ -25,12 +27,8 @@ class LabListSerializer(serializers.ModelSerializer):
 
 
 class LabDetailSerializer(serializers.ModelSerializer):
-    packets = PacketSerializer(many=True, read_only=True)
     challenges = ChallengeSerializer(many=True, read_only=True)
 
     class Meta:
         model = Lab
-        fields = [
-            'id', 'title', 'topic', 'difficulty',
-            'resources', 'is_published', 'packets', 'challenges'
-        ]
+        fields = ['id', 'title', 'topic', 'difficulty', 'resources', 'is_published', 'challenges']

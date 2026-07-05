@@ -24,6 +24,13 @@ class ChallengeAdmin(admin.ModelAdmin):
     ordering = ['lab', 'order']
 
 
-admin.site.register(Packet)
+@admin.register(Packet)
+class PacketAdmin(admin.ModelAdmin):
+    list_display = ['lab', 'packet_number', 'protocol', 'source_ip', 'dest_ip', 'challenge']
+    list_editable = ['challenge']
+    list_filter = ['lab', 'protocol']
+    ordering = ['lab', 'packet_number']
+
+
 admin.site.register(Attempt)
 admin.site.register(Progress)

@@ -9,6 +9,7 @@ from rest_framework.generics import ListAPIView, RetrieveAPIView
 from .models import Lab, Attempt, Progress, Packet, Challenge
 from .serializers import LabListSerializer, LabDetailSerializer
 from django.shortcuts import get_object_or_404
+from .ai_explainer import explain_packet
 
 
 @api_view(['POST'])
@@ -99,12 +100,18 @@ def submit_answer_view(request, pk):
     is_correct = answer_given.lower() == challenge.correct_answer.strip().lower()
     lab = challenge.lab
 
-    # Ensure a Progress row exists as soon as the student engages with any lab
+    # Ensure a Progress row exists as soon as the student engages with any lab,
+    # and keep total_labs in sync with however many published labs currently exist
+    current_total = Lab.objects.filter(is_published=True).count()
     progress, created = Progress.objects.get_or_create(
         student=request.user,
-        defaults={'labs_completed': 0, 'total_labs': Lab.objects.filter(is_published=True).count()}
+        defaults={'labs_completed': 0, 'total_labs': current_total}
     )
+    if progress.total_labs != current_total:
+        progress.total_labs = current_total
+        progress.save()
 
+    # Check completion status BEFORE this attempt
     correct_challenge_ids_before = set(
         Attempt.objects.filter(
             student=request.user, challenge__lab=lab, is_correct=True
@@ -137,12 +144,36 @@ def submit_answer_view(request, pk):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def my_progress_view(request):
+    current_total = Lab.objects.filter(is_published=True).count()
+
     progress, created = Progress.objects.get_or_create(
         student=request.user,
-        defaults={'labs_completed': 0, 'total_labs': Lab.objects.filter(is_published=True).count()}
+        defaults={'labs_completed': 0, 'total_labs': current_total}
     )
+
+    # Keep total_labs in sync even if it already existed with a stale value
+    if progress.total_labs != current_total:
+        progress.total_labs = current_total
+        progress.save()
+
     return Response({
         'labs_completed': progress.labs_completed,
         'total_labs': progress.total_labs,
         'last_activity': progress.last_activity,
     })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def explain_packet_view(request, pk):
+    packet = get_object_or_404(Packet, pk=pk)
+
+    try:
+        explanation = explain_packet(packet)
+    except Exception as e:
+        return Response(
+            {'error': 'Could not generate explanation right now.'},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE
+        )
+
+    return Response({'explanation': explanation})

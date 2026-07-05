@@ -2,7 +2,7 @@ import pytest
 from rest_framework.test import APIClient
 from django.contrib.auth.models import User
 from core.models import Lab, Packet, Challenge, Attempt, Progress
-
+from unittest.mock import patch
 
 @pytest.fixture
 def api_client():
@@ -156,20 +156,20 @@ def test_lab_detail_includes_packets_and_challenges(authenticated_client):
         title='Handshake Lab', topic='TCP', difficulty='Beginner',
         pcap_file='pcaps/handshake.pcap', is_published=True
     )
-    Packet.objects.create(
-        lab=lab, packet_number=1, source_ip='192.168.1.5',
-        dest_ip='93.184.216.34', protocol='TCP', flags='SYN',
-        summary='Client requests connection'
-    )
-    Challenge.objects.create(
+    challenge = Challenge.objects.create(
         lab=lab, order=1, question='Which packet is SYN?',
         correct_answer='Packet 1'
+    )
+    Packet.objects.create(
+        lab=lab, challenge=challenge, packet_number=1, source_ip='192.168.1.5',
+        dest_ip='93.184.216.34', protocol='TCP', flags='SYN',
+        summary='Client requests connection'
     )
 
     response = authenticated_client.get(f'/api/labs/{lab.id}/')
     assert response.status_code == 200
-    assert len(response.data['packets']) == 1
     assert len(response.data['challenges']) == 1
+    assert len(response.data['challenges'][0]['packets']) == 1
     assert 'correct_answer' not in response.data['challenges'][0]
 
 
@@ -293,3 +293,45 @@ def test_progress_creates_default_if_none_exists(authenticated_client):
     response = authenticated_client.get('/api/progress/')
     assert response.status_code == 200
     assert response.data['labs_completed'] == 0
+
+
+@pytest.mark.django_db
+def test_explain_packet_requires_auth(api_client):
+    lab = Lab.objects.create(
+        title='Explain Test Lab', topic='TCP', difficulty='Beginner',
+        pcap_file='pcaps/test.pcap', is_published=True
+    )
+    packet = Packet.objects.create(
+        lab=lab, packet_number=1, source_ip='192.168.1.5',
+        dest_ip='93.184.216.34', protocol='TCP', flags='SYN',
+        summary='Client requests connection'
+    )
+
+    response = api_client.post(f'/api/packets/{packet.id}/explain/')
+    assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_explain_packet_not_found(authenticated_client):
+    response = authenticated_client.post('/api/packets/9999/explain/')
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+@patch('core.views.explain_packet')
+def test_explain_packet_returns_explanation(mock_explain, authenticated_client):
+    mock_explain.return_value = "This is a mocked AI explanation."
+
+    lab = Lab.objects.create(
+        title='Explain Test Lab 2', topic='TCP', difficulty='Beginner',
+        pcap_file='pcaps/test.pcap', is_published=True
+    )
+    packet = Packet.objects.create(
+        lab=lab, packet_number=1, source_ip='192.168.1.5',
+        dest_ip='93.184.216.34', protocol='TCP', flags='SYN',
+        summary='Client requests connection'
+    )
+
+    response = authenticated_client.post(f'/api/packets/{packet.id}/explain/')
+    assert response.status_code == 200
+    assert response.data['explanation'] == "This is a mocked AI explanation."

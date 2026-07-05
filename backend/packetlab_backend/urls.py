@@ -25,6 +25,7 @@ urlpatterns = [
     path('api/auth/', include('core.urls')),
     path('api/labs/', include('core.lab_urls')),
     path('api/challenges/', include('core.challenge_urls')),
+    path('api/packets/', include('core.packet_urls')),
     path('api/progress/', my_progress_view, name='my-progress'),
 ]
 

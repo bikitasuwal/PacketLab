@@ -23,6 +23,9 @@ class Lab(models.Model):
 
 class Packet(models.Model):
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='packets')
+    challenge = models.ForeignKey(
+        'Challenge', on_delete=models.SET_NULL, null=True, blank=True, related_name='packets'
+    )
     packet_number = models.IntegerField()
     source_ip = models.GenericIPAddressField()
     dest_ip = models.GenericIPAddressField()
