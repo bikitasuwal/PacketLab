@@ -113,6 +113,7 @@ function ChallengeBlock({ challenge }) {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
   const [view, setView] = useState('cards');
+  const [completed, setCompleted] = useState(challenge.is_completed);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -122,6 +123,9 @@ function ChallengeBlock({ challenge }) {
     try {
       const response = await api.post(`/challenges/${challenge.id}/submit/`, { answer });
       setResult(response.data);
+      if (response.data.is_correct) {
+        setCompleted(true);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -132,7 +136,10 @@ function ChallengeBlock({ challenge }) {
   return (
     <div
       className="p-4 rounded-lg border mb-6"
-      style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+      style={{
+        backgroundColor: 'var(--color-surface)',
+        borderColor: completed ? 'var(--color-accent)' : 'var(--color-border)',
+      }}
     >
       {challenge.packets.length > 0 && (
         <>
@@ -173,11 +180,14 @@ function ChallengeBlock({ challenge }) {
         </>
       )}
 
-      <p className="text-sm font-medium mb-3" style={{ color: 'var(--color-text)' }}>
-        <span style={{ color: 'var(--color-accent)' }} className="font-mono mr-2">
+      <p className="text-sm font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--color-text)' }}>
+        <span style={{ color: 'var(--color-accent)' }} className="font-mono">
           Q{challenge.order}
         </span>
         {challenge.question}
+        {completed && (
+          <CheckCircle2 size={15} style={{ color: 'var(--color-accent)' }} className="shrink-0 ml-auto" />
+        )}
       </p>
 
       <form onSubmit={handleSubmit} className="flex gap-2">

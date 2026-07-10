@@ -335,3 +335,24 @@ def test_explain_packet_returns_explanation(mock_explain, authenticated_client):
     response = authenticated_client.post(f'/api/packets/{packet.id}/explain/')
     assert response.status_code == 200
     assert response.data['explanation'] == "This is a mocked AI explanation."
+
+@pytest.mark.django_db
+def test_lab_list_shows_completion_status(authenticated_client):
+    lab = Lab.objects.create(
+        title='Completion Test Lab', topic='TCP', difficulty='Beginner',
+        pcap_file='pcaps/test.pcap', is_published=True
+    )
+    challenge = Challenge.objects.create(lab=lab, order=1, question='Q?', correct_answer='A1')
+
+    response = authenticated_client.get('/api/labs/')
+    lab_data = next(l for l in response.data if l['id'] == lab.id)
+    assert lab_data['is_completed'] is False
+    assert lab_data['challenges_completed'] == 0
+    assert lab_data['total_challenges'] == 1
+
+    authenticated_client.post(f'/api/challenges/{challenge.id}/submit/', {'answer': 'A1'})
+
+    response = authenticated_client.get('/api/labs/')
+    lab_data = next(l for l in response.data if l['id'] == lab.id)
+    assert lab_data['is_completed'] is True
+    assert lab_data['challenges_completed'] == 1

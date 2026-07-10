@@ -77,11 +77,17 @@ class LabListView(ListAPIView):
     serializer_class = LabListSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_serializer_context(self):
+        return {'request': self.request}
+
 
 class LabDetailView(RetrieveAPIView):
     queryset = Lab.objects.filter(is_published=True)
     serializer_class = LabDetailSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_serializer_context(self):
+        return {'request': self.request}
 
 
 

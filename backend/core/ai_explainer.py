@@ -1,6 +1,6 @@
 import os
 from groq import Groq
-
+import json
 
 def get_client():
     return Groq(api_key=os.environ.get("GROQ_API_KEY"))
@@ -31,3 +31,54 @@ Summary: {packet.summary}
     )
 
     return response.choices[0].message.content
+
+
+def generate_challenges_for_lab(lab):
+    packets = lab.packets.all().order_by('packet_number')
+
+    packet_summaries = "\n".join([
+        f"Packet {p.packet_number}: {p.protocol} | {p.source_ip} -> {p.dest_ip} | "
+        f"flags: {p.flags or 'none'} | {p.summary}"
+        for p in packets
+    ])
+
+    prompt = f"""You are creating quiz questions for a cybersecurity networking course, 
+based on a real captured network traffic lab called "{lab.title}" (topic: {lab.topic}).
+
+Here are the packets in this capture:
+{packet_summaries}
+
+Generate 2-3 challenge questions that test whether a student correctly understood 
+this traffic. Each question must have ONE clear, short, unambiguous correct answer 
+that could be typed as plain text (e.g. a packet number, an IP address, a domain 
+name, or a short word/number).
+
+Respond ONLY with valid JSON, no other text, in exactly this format:
+[
+  {{
+    "question": "...",
+    "correct_answer": "...",
+    "relevant_packet_numbers": [1, 2]
+  }}
+]
+"""
+
+    client = get_client()
+    response = client.chat.completions.create(
+        messages=[
+            {"role": "system", "content": "You are a precise quiz generator. Only output valid JSON."},
+            {"role": "user", "content": prompt},
+        ],
+        model="llama-3.3-70b-versatile",
+        max_completion_tokens=800,
+        temperature=0.3,
+    )
+
+    raw_content = response.choices[0].message.content.strip()
+
+    if raw_content.startswith('```'):
+        raw_content = raw_content.strip('`')
+        if raw_content.startswith('json'):
+            raw_content = raw_content[4:].strip()
+
+    return json.loads(raw_content)

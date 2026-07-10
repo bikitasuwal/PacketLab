@@ -1,24 +1,33 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Shield, LogIn, AlertCircle } from 'lucide-react';
+import { Shield, UserPlus, AlertCircle } from 'lucide-react';
 import api from '../api/axios';
 
-function Login() {
+function Register() {
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
+
     try {
-      const response = await api.post('/auth/login/', { username, password });
-      localStorage.setItem('access_token', response.data.access);
-      localStorage.setItem('refresh_token', response.data.refresh);
+      await api.post('/auth/register/', { username, email, password });
+
+      const loginResponse = await api.post('/auth/login/', { username, password });
+      localStorage.setItem('access_token', loginResponse.data.access);
+      localStorage.setItem('refresh_token', loginResponse.data.refresh);
       navigate('/dashboard');
     } catch (err) {
-      setError('Invalid username or password.');
+      const message = err.response?.data?.error || 'Could not create account. Try a different username.';
+      setError(message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -29,7 +38,7 @@ function Login() {
     >
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm p-8 rounded-lg border"
+        className="w-full max-w-sm p-8 rounded-lg border fade-in"
         style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
       >
         <div className="flex items-center gap-2 mb-8">
@@ -59,6 +68,19 @@ function Login() {
           type="text"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
+          required
+          className="w-full mb-4 px-3 py-2 rounded-md text-sm outline-none border font-mono"
+          style={{ backgroundColor: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
+        />
+
+        <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--color-text-dim)' }}>
+          Email
+        </label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
           className="w-full mb-4 px-3 py-2 rounded-md text-sm outline-none border font-mono"
           style={{ backgroundColor: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
         />
@@ -70,28 +92,30 @@ function Login() {
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          required
           className="w-full mb-6 px-3 py-2 rounded-md text-sm outline-none border font-mono"
           style={{ backgroundColor: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
         />
 
         <button
           type="submit"
-          className="w-full flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium"
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium disabled:opacity-60"
           style={{ backgroundColor: 'var(--color-accent)', color: '#052E20' }}
         >
-          <LogIn size={15} />
-          Log in
+          <UserPlus size={15} />
+          {loading ? 'Creating account...' : 'Create account'}
         </button>
 
         <p className="text-xs text-center mt-4" style={{ color: 'var(--color-text-dim)' }}>
-  Don't have an account?{' '}
-  <Link to="/register" className="hover:underline" style={{ color: 'var(--color-accent)' }}>
-    Sign up
-  </Link>
-</p>
+          Already have an account?{' '}
+          <Link to="/login" className="hover:underline" style={{ color: 'var(--color-accent)' }}>
+            Log in
+          </Link>
+        </p>
       </form>
     </div>
   );
 }
 
-export default Login;
+export default Register;

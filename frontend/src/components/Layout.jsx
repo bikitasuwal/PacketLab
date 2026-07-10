@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Shield, BookOpen, Activity, LogOut, Radio } from 'lucide-react';
+import { Shield, BookOpen, Activity, LogOut, Radio, LayoutDashboard } from 'lucide-react';
 
 function Layout({ children }) {
   const navigate = useNavigate();
@@ -12,9 +12,10 @@ function Layout({ children }) {
   };
 
   const navItems = [
-    { path: '/labs', label: 'Labs', icon: BookOpen },
-    { path: '/progress', label: 'Progress', icon: Activity },
-  ];
+  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/labs', label: 'Labs', icon: BookOpen },
+  { path: '/progress', label: 'Progress', icon: Activity },
+];
 
   return (
     <div className="min-h-screen flex" style={{ backgroundColor: 'var(--color-bg)' }}>
