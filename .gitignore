@@ -4,9 +4,13 @@ __pycache__/
 *.pyc
 db.sqlite3
 *.log
+staticfiles/
 
 # Environment variables
 .env
+
+# Media uploads
+media/pcaps/
 
 # Node / React
 node_modules/
