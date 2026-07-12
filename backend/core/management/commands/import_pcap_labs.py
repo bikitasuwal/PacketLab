@@ -155,7 +155,10 @@ class Command(BaseCommand):
 
                 # Generate challenges with AI
                 try:
-                    generated = generate_challenges_for_lab(lab)
+                    generated, difficulty = generate_challenges_for_lab(lab)
+                    if difficulty:
+                        lab.difficulty = difficulty
+                        lab.save(update_fields=['difficulty'])
                     for item in generated:
                         challenge = Challenge.objects.create(
                             lab=lab,

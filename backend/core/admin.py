@@ -17,7 +17,10 @@ class LabAdmin(admin.ModelAdmin):
                 continue
             try:
                 Challenge.objects.filter(lab=lab).delete()
-                generated = generate_challenges_for_lab(lab)
+                generated, difficulty = generate_challenges_for_lab(lab)
+                if difficulty:
+                    lab.difficulty = difficulty
+                    lab.save(update_fields=['difficulty'])
                 for item in generated:
                     Challenge.objects.create(
                         lab=lab,
@@ -25,7 +28,7 @@ class LabAdmin(admin.ModelAdmin):
                         question=item['question'],
                         correct_answer=item['correct_answer'],
                     )
-                self.message_user(request, f'"{lab.title}": created {len(generated)} challenges')
+                self.message_user(request, f'"{lab.title}": created {len(generated)} challenges (difficulty: {difficulty})')
             except Exception as e:
                 self.message_user(request, f'"{lab.title}" AI failed: {e}', level=messages.ERROR)
 
@@ -48,7 +51,10 @@ class LabAdmin(admin.ModelAdmin):
                 return
 
             try:
-                generated = generate_challenges_for_lab(obj)
+                generated, difficulty = generate_challenges_for_lab(obj)
+                if difficulty:
+                    obj.difficulty = difficulty
+                    obj.save(update_fields=['difficulty'])
                 for item in generated:
                     challenge = Challenge.objects.create(
                         lab=obj,
@@ -61,7 +67,7 @@ class LabAdmin(admin.ModelAdmin):
                     ).update(challenge=challenge)
                 self.message_user(
                     request,
-                    f"Created {len(parsed_packets)} packets and {len(generated)} challenges."
+                    f"Created {len(parsed_packets)} packets and {len(generated)} challenges (difficulty: {difficulty})."
                 )
             except Exception as e:
                 self.message_user(

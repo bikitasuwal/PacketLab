@@ -22,7 +22,10 @@ class Command(BaseCommand):
             self.stdout.write(f'Generating challenges for "{lab.title}" ({packet_count} packets)...')
 
             try:
-                generated = generate_challenges_for_lab(lab)
+                generated, difficulty = generate_challenges_for_lab(lab)
+                if difficulty:
+                    lab.difficulty = difficulty
+                    lab.save(update_fields=['difficulty'])
                 for item in generated:
                     Challenge.objects.create(
                         lab=lab,
