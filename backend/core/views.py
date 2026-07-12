@@ -1,3 +1,4 @@
+import re
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -12,6 +13,9 @@ from .serializers import LabListSerializer, LabDetailSerializer, RatingSerialize
 from django.shortcuts import get_object_or_404
 from .ai_explainer import explain_packet
 
+EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$')
+PASSWORD_REGEX = re.compile(r'^(?=.*[A-Za-z])(?=.*\d).{8,}$')
+
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -25,6 +29,18 @@ def register_view(request):
     if not username or not password:
         return Response(
             {'error': 'Username and password are required.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if email and not EMAIL_REGEX.match(email):
+        return Response(
+            {'error': 'Please enter a valid email address.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if not PASSWORD_REGEX.match(password):
+        return Response(
+            {'error': 'Password must be at least 8 characters and contain at least one letter and one number.'},
             status=status.HTTP_400_BAD_REQUEST
         )
 
