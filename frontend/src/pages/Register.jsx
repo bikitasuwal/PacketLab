@@ -68,7 +68,7 @@ function Register() {
         )}
 
         <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--color-text-dim)' }}>
-          Username
+          Username *
         </label>
         <input
           type="text"
@@ -80,7 +80,7 @@ function Register() {
         />
 
         <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--color-text-dim)' }}>
-          Email
+          Email *
         </label>
         <input
           type="email"
@@ -114,7 +114,7 @@ function Register() {
         />
 
         <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--color-text-dim)' }}>
-          Password
+          Password *
         </label>
         <input
           type="password"
