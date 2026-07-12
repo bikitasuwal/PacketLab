@@ -8,6 +8,28 @@ from .ai_explainer import generate_challenges_for_lab
 @admin.register(Lab)
 class LabAdmin(admin.ModelAdmin):
     list_display = ['title', 'topic', 'difficulty', 'is_published']
+    actions = ['generate_challenges_action']
+
+    def generate_challenges_action(self, request, queryset):
+        for lab in queryset:
+            if lab.packets.count() == 0:
+                self.message_user(request, f'"{lab.title}" has no packets. Upload a pcap first.', level=messages.WARNING)
+                continue
+            try:
+                Challenge.objects.filter(lab=lab).delete()
+                generated = generate_challenges_for_lab(lab)
+                for item in generated:
+                    Challenge.objects.create(
+                        lab=lab,
+                        order=lab.challenges.count() + 1,
+                        question=item['question'],
+                        correct_answer=item['correct_answer'],
+                    )
+                self.message_user(request, f'"{lab.title}": created {len(generated)} challenges')
+            except Exception as e:
+                self.message_user(request, f'"{lab.title}" AI failed: {e}', level=messages.ERROR)
+
+    generate_challenges_action.short_description = 'Generate AI challenges for selected labs'
 
     def save_model(self, request, obj, form, change):
         is_new_file = 'pcap_file' in form.changed_data
