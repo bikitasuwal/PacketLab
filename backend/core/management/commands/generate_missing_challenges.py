@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from core.models import Lab, Challenge
+from core.models import Lab, Packet, Challenge
 from core.ai_explainer import generate_challenges_for_lab
 
 
@@ -27,12 +27,15 @@ class Command(BaseCommand):
                     lab.difficulty = difficulty
                     lab.save(update_fields=['difficulty'])
                 for item in generated:
-                    Challenge.objects.create(
+                    challenge = Challenge.objects.create(
                         lab=lab,
                         order=lab.challenges.count() + 1,
                         question=item['question'],
                         correct_answer=item['correct_answer'],
                     )
+                    Packet.objects.filter(
+                        lab=lab, packet_number__in=item.get('relevant_packet_numbers', [])
+                    ).update(challenge=challenge)
                 self.stdout.write(self.style.SUCCESS(f'  Created {len(generated)} challenges'))
                 count += 1
             except Exception as e:

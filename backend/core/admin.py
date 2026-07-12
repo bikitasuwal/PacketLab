@@ -17,17 +17,21 @@ class LabAdmin(admin.ModelAdmin):
                 continue
             try:
                 Challenge.objects.filter(lab=lab).delete()
+                Packet.objects.filter(lab=lab).update(challenge=None)
                 generated, difficulty = generate_challenges_for_lab(lab)
                 if difficulty:
                     lab.difficulty = difficulty
                     lab.save(update_fields=['difficulty'])
                 for item in generated:
-                    Challenge.objects.create(
+                    challenge = Challenge.objects.create(
                         lab=lab,
                         order=lab.challenges.count() + 1,
                         question=item['question'],
                         correct_answer=item['correct_answer'],
                     )
+                    Packet.objects.filter(
+                        lab=lab, packet_number__in=item.get('relevant_packet_numbers', [])
+                    ).update(challenge=challenge)
                 self.message_user(request, f'"{lab.title}": created {len(generated)} challenges (difficulty: {difficulty})')
             except Exception as e:
                 self.message_user(request, f'"{lab.title}" AI failed: {e}', level=messages.ERROR)
