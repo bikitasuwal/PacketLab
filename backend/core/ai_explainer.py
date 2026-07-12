@@ -58,15 +58,30 @@ based on a real captured network traffic lab called "{lab.title}" (topic: {lab.t
 Here are the packets in this capture:
 {packet_summaries}
 
-Generate exactly {num_challenges} challenge questions that test whether a student correctly
-understood this traffic. Each question must have ONE clear, short, unambiguous correct
-answer that could be typed as plain text (e.g. a packet number, an IP address, a domain
-name, or a short word/number).
+Generate exactly {num_challenges} challenge questions. Rules:
+1. At least 70% of questions MUST require reading specific packet data
+   (IP addresses, packet numbers, flags, ports, protocols, counts).
+2. The remaining 30% can be analysis questions about traffic patterns,
+   but must still be answerable from the packet data.
+3. Do NOT generate theory/definition questions like "What is DNS?"
+   or "Explain TCP handshake". Every question must use THIS capture's data.
 
-Also assess the difficulty of this lab based on the protocols and complexity of the traffic.
+Good examples:
+- "What is the source IP address in packet 5?"
+- "Which packet number contains a DNS query?"
+- "How many packets use the SYN flag?"
+- "What destination port does the server respond on?"
+- "Which protocol appears most in this capture?"
+
+Bad examples (DO NOT generate these):
+- "What is DNS?"
+- "What does the TCP three-way handshake do?"
+- "Define ICMP"
+
+Also assess the difficulty of this lab based on the protocols and complexity.
 Use one of: "Beginner", "Intermediate", or "Advanced".
 
-Respond ONLY with valid JSON, no other text, in exactly this format:
+Respond ONLY with valid JSON in this format:
 {{
   "difficulty": "Beginner",
   "challenges": [
