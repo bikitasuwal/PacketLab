@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib import messages
-from .models import Lab, Packet, Challenge, Attempt, Progress
+from .models import Lab, Packet, Challenge, Attempt, Progress, Rating
 from .pcap_parser import parse_pcap_to_packets
 from .ai_explainer import generate_challenges_for_lab
 
@@ -8,7 +8,6 @@ from .ai_explainer import generate_challenges_for_lab
 @admin.register(Lab)
 class LabAdmin(admin.ModelAdmin):
     list_display = ['title', 'topic', 'difficulty', 'is_published']
-    actions = ['generate_challenges_with_ai']
 
     def save_model(self, request, obj, form, change):
         is_new_file = 'pcap_file' in form.changed_data
@@ -16,36 +15,38 @@ class LabAdmin(admin.ModelAdmin):
 
         if is_new_file and obj.pcap_file:
             Packet.objects.filter(lab=obj).delete()
-            parsed_packets = parse_pcap_to_packets(obj.pcap_file.path)
-            for p in parsed_packets:
-                Packet.objects.create(lab=obj, **p)
-
-    def generate_challenges_with_ai(self, request, queryset):
-        for lab in queryset:
-            if not lab.packets.exists():
-                self.message_user(request, f"{lab.title}: no packets found, skipped.", level=messages.WARNING)
-                continue
+            Challenge.objects.filter(lab=obj).delete()
 
             try:
-                generated = generate_challenges_for_lab(lab)
+                parsed_packets = parse_pcap_to_packets(obj.pcap_file.path)
+                for p in parsed_packets:
+                    Packet.objects.create(lab=obj, **p)
             except Exception as e:
-                self.message_user(request, f"{lab.title}: AI generation failed ({e})", level=messages.ERROR)
-                continue
+                self.message_user(request, f"Failed to parse pcap: {e}", level=messages.ERROR)
+                return
 
-            for item in generated:
-                challenge = Challenge.objects.create(
-                    lab=lab,
-                    order=lab.challenges.count() + 1,
-                    question=item['question'],
-                    correct_answer=item['correct_answer'],
+            try:
+                generated = generate_challenges_for_lab(obj)
+                for item in generated:
+                    challenge = Challenge.objects.create(
+                        lab=obj,
+                        order=obj.challenges.count() + 1,
+                        question=item['question'],
+                        correct_answer=item['correct_answer'],
+                    )
+                    Packet.objects.filter(
+                        lab=obj, packet_number__in=item.get('relevant_packet_numbers', [])
+                    ).update(challenge=challenge)
+                self.message_user(
+                    request,
+                    f"Created {len(parsed_packets)} packets and {len(generated)} challenges."
                 )
-                Packet.objects.filter(
-                    lab=lab, packet_number__in=item.get('relevant_packet_numbers', [])
-                ).update(challenge=challenge)
-
-            self.message_user(request, f"{lab.title}: generated {len(generated)} draft challenges. Please review before publishing.")
-
-    generate_challenges_with_ai.short_description = "Generate draft challenges with AI"
+            except Exception as e:
+                self.message_user(
+                    request,
+                    f"Parsed {len(parsed_packets)} packets, but AI challenge generation failed: {e}",
+                    level=messages.WARNING
+                )
 
 
 @admin.register(Challenge)
@@ -64,3 +65,4 @@ class PacketAdmin(admin.ModelAdmin):
 
 admin.site.register(Attempt)
 admin.site.register(Progress)
+admin.site.register(Rating)

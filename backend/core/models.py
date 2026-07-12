@@ -71,3 +71,16 @@ class Progress(models.Model):
 
     def __str__(self):
         return f"{self.student.username} - {self.labs_completed}/{self.total_labs}"
+
+
+class Rating(models.Model):
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ratings')
+    lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='ratings')
+    score = models.IntegerField()  # 1-5
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['student', 'lab']
+
+    def __str__(self):
+        return f"{self.student.username} - {self.lab.title} - {self.score}/5"

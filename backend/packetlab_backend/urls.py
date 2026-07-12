@@ -18,11 +18,13 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from rest_framework_simplejwt.views import TokenRefreshView
 from core.views import my_progress_view
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('core.urls')),
+    path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/labs/', include('core.lab_urls')),
     path('api/challenges/', include('core.challenge_urls')),
     path('api/packets/', include('core.packet_urls')),

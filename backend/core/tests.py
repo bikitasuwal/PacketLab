@@ -213,7 +213,7 @@ def test_submit_incorrect_answer(authenticated_client):
     })
     assert response.status_code == 200
     assert response.data['is_correct'] is False
-    assert response.data['correct_answer'] == 'Packet 2'
+    assert response.data['message'] == 'Not quite. Try again!'
 
 
 @pytest.mark.django_db

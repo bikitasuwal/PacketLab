@@ -4,10 +4,11 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
+from django.db import transaction
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.generics import ListAPIView, RetrieveAPIView
-from .models import Lab, Attempt, Progress, Packet, Challenge
-from .serializers import LabListSerializer, LabDetailSerializer
+from .models import Lab, Attempt, Progress, Packet, Challenge, Rating
+from .serializers import LabListSerializer, LabDetailSerializer, RatingSerializer
 from django.shortcuts import get_object_or_404
 from .ai_explainer import explain_packet
 
@@ -93,6 +94,7 @@ class LabDetailView(RetrieveAPIView):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@transaction.atomic
 def submit_answer_view(request, pk):
     challenge = get_object_or_404(Challenge, pk=pk)
     answer_given = request.data.get('answer', '').strip()
@@ -143,8 +145,7 @@ def submit_answer_view(request, pk):
 
     return Response({
         'is_correct': is_correct,
-        'correct_answer': challenge.correct_answer,
-        'message': 'Correct! Well done.' if is_correct else f'Not quite. The correct answer was: {challenge.correct_answer}'
+        'message': 'Correct! Well done.' if is_correct else 'Not quite. Try again!'
     })
 
 @api_view(['GET'])
@@ -183,3 +184,118 @@ def explain_packet_view(request, pk):
         )
 
     return Response({'explanation': explanation})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def rate_lab_view(request, pk):
+    lab = get_object_or_404(Lab, pk=pk)
+    score = request.data.get('score')
+
+    if not isinstance(score, int) or score < 1 or score > 5:
+        return Response(
+            {'error': 'Score must be an integer between 1 and 5.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    rating, created = Rating.objects.update_or_create(
+        student=request.user,
+        lab=lab,
+        defaults={'score': score}
+    )
+
+    return Response({
+        'message': 'Rating saved.' if created else 'Rating updated.',
+        'score': rating.score,
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def lab_rating_view(request, pk):
+    lab = get_object_or_404(Lab, pk=pk)
+    rating = Rating.objects.filter(student=request.user, lab=lab).first()
+    from django.db.models import Avg
+    avg = lab.ratings.aggregate(avg=Avg('score'))['avg']
+
+    return Response({
+        'user_rating': rating.score if rating else None,
+        'average_rating': round(avg, 1) if avg else None,
+        'total_ratings': lab.ratings.count(),
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_pcap_view(request):
+    pcap_file = request.FILES.get('pcap_file')
+    if not pcap_file:
+        return Response(
+            {'error': 'No file provided.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if not pcap_file.name.endswith('.pcap'):
+        return Response(
+            {'error': 'Only .pcap files are supported.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        from .pcap_parser import parse_pcap_file
+        packets = parse_pcap_file(pcap_file)
+        if not packets:
+            return Response(
+                {'error': 'No packets found in the file.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Build protocol stats
+        protocols = {}
+        for p in packets:
+            proto = p['protocol']
+            protocols[proto] = protocols.get(proto, 0) + 1
+
+        return Response({
+            'packets': packets,
+            'count': len(packets),
+            'protocols': protocols,
+            'filename': pcap_file.name,
+        })
+
+    except ImportError:
+        return Response(
+            {'error': 'PCAP parsing is not available.'},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE
+        )
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to parse PCAP file: {str(e)}'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def explain_uploaded_packet_view(request):
+    """Explain a single packet from uploaded data (not from DB)."""
+    packet_data = request.data.get('packet')
+    if not packet_data:
+        return Response(
+            {'error': 'No packet data provided.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    class PacketProxy:
+        def __init__(self, d):
+            for k, v in d.items():
+                setattr(self, k, v)
+
+    try:
+        explanation = explain_packet(PacketProxy(packet_data))
+        return Response({'explanation': explanation})
+    except Exception as e:
+        return Response(
+            {'error': 'Could not generate explanation.'},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE
+        )

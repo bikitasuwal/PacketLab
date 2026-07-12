@@ -36,10 +36,18 @@ Summary: {packet.summary}
 def generate_challenges_for_lab(lab):
     packets = lab.packets.all().order_by('packet_number')
 
+    # Limit to 50 packets to avoid token limits; sample evenly if too many
+    max_packets = 50
+    if packets.count() > max_packets:
+        step = packets.count() // max_packets
+        packet_list = list(packets)[::step][:max_packets]
+    else:
+        packet_list = list(packets)
+
     packet_summaries = "\n".join([
         f"Packet {p.packet_number}: {p.protocol} | {p.source_ip} -> {p.dest_ip} | "
         f"flags: {p.flags or 'none'} | {p.summary}"
-        for p in packets
+        for p in packet_list
     ])
 
     prompt = f"""You are creating quiz questions for a cybersecurity networking course, 
@@ -81,4 +89,7 @@ Respond ONLY with valid JSON, no other text, in exactly this format:
         if raw_content.startswith('json'):
             raw_content = raw_content[4:].strip()
 
-    return json.loads(raw_content)
+    try:
+        return json.loads(raw_content)
+    except json.JSONDecodeError:
+        return []
