@@ -2,7 +2,7 @@ services:
   - type: web
     name: packetlab-backend
     runtime: python
-    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --no-input
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --no-input && python manage.py migrate && python manage.py create_default_admin && python manage.py generate_missing_challenges
     startCommand: gunicorn packetlab_backend.wsgi:application
     envVars:
       - key: SECRET_KEY
