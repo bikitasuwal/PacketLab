@@ -1,14 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, Gauge, Network, CheckCircle2, Search } from 'lucide-react';
+import { Gauge, Network, CheckCircle2, Search, Zap } from 'lucide-react';
 import api from '../api/axios';
 import Layout from '../components/Layout';
-
-const difficultyStyle = {
-  Beginner: { color: '#34D399', bg: 'rgba(52,211,153,0.12)' },
-  Intermediate: { color: '#FBBF24', bg: 'rgba(251,191,36,0.12)' },
-  Advanced: { color: '#F87171', bg: 'rgba(248,113,113,0.12)' },
-};
+import { difficultyStyle, topicStyle } from '../constants/styles';
 
 const difficultyFilters = ['All', 'Beginner', 'Intermediate', 'Advanced'];
 
@@ -20,25 +15,27 @@ function LabList() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.get('/labs/')
+    const controller = new AbortController();
+    api.get('/labs/', { signal: controller.signal })
       .then((res) => setLabs(res.data))
-      .catch((err) => console.error(err))
+      .catch((err) => {
+        if (err.name !== 'CanceledError') console.error(err);
+      })
       .finally(() => setLoading(false));
+    return () => controller.abort();
   }, []);
 
   const filteredLabs = labs.filter((lab) => {
     const matchesSearch =
-      lab.title.toLowerCase().includes(search.toLowerCase()) ||
-      lab.topic.toLowerCase().includes(search.toLowerCase());
-    const matchesDifficulty =
-      difficultyFilter === 'All' || lab.difficulty === difficultyFilter;
+      lab.title.toLowerCase().includes(search.toLowerCase()) || lab.topic.toLowerCase().includes(search.toLowerCase());
+    const matchesDifficulty = difficultyFilter === 'All' || lab.difficulty === difficultyFilter;
     return matchesSearch && matchesDifficulty;
   });
 
   return (
     <Layout>
-      <div className="p-10 max-w-3xl">
-        <div className="flex items-center gap-2 mb-1">
+      <div className="p-4 md:p-10 max-w-6xl mx-auto">
+        <div className="flex items-center gap-2 mb-1 fade-in">
           <Network size={20} style={{ color: 'var(--color-accent)' }} />
           <h1
             className="text-2xl font-semibold"
@@ -51,7 +48,7 @@ function LabList() {
           Explore real captured traffic and test your understanding.
         </p>
 
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <div className="flex items-center gap-2 mb-5 flex-wrap">
           <div
             className="flex items-center gap-2 px-3 py-2 rounded-md border flex-1 min-w-[200px]"
             style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
@@ -86,52 +83,103 @@ function LabList() {
         </div>
 
         {loading ? (
-          <p style={{ color: 'var(--color-text-dim)' }}>Loading labs...</p>
+          <div className="flex items-center gap-2 py-8" style={{ color: 'var(--color-text-dim)' }}>
+            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            Loading labs...
+          </div>
         ) : filteredLabs.length === 0 ? (
-          <p style={{ color: 'var(--color-text-dim)' }}>No labs match your search.</p>
+          <div
+            className="text-center py-12 rounded-xl border fade-in"
+            style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+          >
+            <Search size={24} style={{ color: 'var(--color-text-dim)' }} className="mx-auto mb-3" />
+            <p className="text-sm" style={{ color: 'var(--color-text-dim)' }}>
+              {labs.length === 0 ? 'No labs available yet.' : 'No labs match your search.'}
+            </p>
+          </div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredLabs.map((lab) => {
               const d = difficultyStyle[lab.difficulty] || difficultyStyle.Beginner;
+              const t = topicStyle[lab.topic] || { color: 'var(--color-text-dim)', bg: 'var(--color-surface-hover)' };
+              const progressPct = lab.total_challenges > 0
+                ? Math.round((lab.challenges_completed / lab.total_challenges) * 100)
+                : 0;
+
+              const statusText = lab.is_completed
+                ? 'Completed'
+                : lab.challenges_completed > 0
+                  ? `${lab.challenges_completed}/${lab.total_challenges} done`
+                  : 'Not started';
+
+              const statusColor = lab.is_completed
+                ? 'var(--color-accent)'
+                : lab.challenges_completed > 0
+                  ? 'var(--color-text)'
+                  : 'var(--color-text-dim)';
+
               return (
                 <div
                   key={lab.id}
                   onClick={() => navigate(`/labs/${lab.id}`)}
-                  className="group flex items-center justify-between p-4 rounded-lg border cursor-pointer transition-colors fade-in"
-                  style={{
-                    backgroundColor: 'var(--color-surface)',
-                    borderColor: lab.is_completed ? 'var(--color-accent)' : 'var(--color-border)',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-hover)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface)')}
+                  className="group p-5 rounded-xl border cursor-pointer transition-all duration-200 fade-in flex flex-col"
+                  style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = d.color)}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--color-border)')}
                 >
-                  <div className="flex items-center gap-3">
-                    {lab.is_completed && (
-                      <CheckCircle2 size={18} style={{ color: 'var(--color-accent)' }} className="shrink-0" />
-                    )}
-                    <div>
-                      <h2 className="font-medium mb-0.5" style={{ color: 'var(--color-text)' }}>
-                        {lab.title}
-                      </h2>
-                      <p className="text-xs font-mono" style={{ color: 'var(--color-text-dim)' }}>
-                        {lab.topic} · {lab.challenges_completed}/{lab.total_challenges} challenges
-                      </p>
+                  {/* Header: icon + difficulty */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div
+                      className="flex items-center justify-center w-9 h-9 rounded-lg shrink-0"
+                      style={{ backgroundColor: t.bg }}
+                    >
+                      {lab.is_completed ? (
+                        <CheckCircle2 size={16} style={{ color: 'var(--color-accent)' }} />
+                      ) : (
+                        <Zap size={16} style={{ color: t.color }} />
+                      )}
                     </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
                     <span
                       className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded"
                       style={{ color: d.color, backgroundColor: d.bg }}
                     >
-                      <Gauge size={12} />
+                      <Gauge size={11} />
                       {lab.difficulty}
                     </span>
-                    <ChevronRight
-                      size={16}
-                      style={{ color: 'var(--color-text-dim)' }}
-                      className="group-hover:translate-x-0.5 transition-transform"
-                    />
+                  </div>
+
+                  {/* Title */}
+                  <h3
+                    className="text-sm font-semibold mb-1"
+                    style={{ color: 'var(--color-text)' }}
+                  >
+                    {lab.title}
+                  </h3>
+
+                  {/* Challenge count */}
+                  <p className="text-xs mb-3" style={{ color: 'var(--color-text-dim)' }}>
+                    {lab.total_challenges} {lab.total_challenges === 1 ? 'challenge' : 'challenges'}
+                  </p>
+
+                  {/* Spacer to push bottom content down */}
+                  <div className="flex-1" />
+
+                  {/* Status + Progress bar */}
+                  <div className="mt-2">
+                    <p className="text-xs font-medium mb-1.5" style={{ color: statusColor }}>
+                      {statusText}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--color-border)' }}>
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${progressPct}%`, backgroundColor: 'var(--color-accent)' }}
+                        />
+                      </div>
+                      <span className="text-xs font-mono shrink-0" style={{ color: 'var(--color-text-dim)' }}>
+                        {lab.challenges_completed}/{lab.total_challenges}
+                      </span>
+                    </div>
                   </div>
                 </div>
               );

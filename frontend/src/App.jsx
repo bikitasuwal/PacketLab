@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import LabList from './pages/LabList';
 import LabDetail from './pages/LabDetail';
 import Progress from './pages/Progress';
+import Upload from './pages/Upload';
 
 function isAuthenticated() {
   return !!localStorage.getItem('access_token');
@@ -24,7 +25,9 @@ function App() {
         <Route path="/labs" element={<ProtectedRoute><LabList /></ProtectedRoute>} />
         <Route path="/labs/:id" element={<ProtectedRoute><LabDetail /></ProtectedRoute>} />
         <Route path="/progress" element={<ProtectedRoute><Progress /></ProtectedRoute>} />
+        <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
         <Route path="/" element={<Navigate to="/dashboard" />} />
+        <Route path="*" element={<Navigate to="/dashboard" />} />
       </Routes>
     </BrowserRouter>
   );

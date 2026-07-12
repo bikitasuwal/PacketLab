@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -11,17 +11,12 @@ import {
   List,
   GitBranch,
   X,
+  Star,
 } from 'lucide-react';
 import api from '../api/axios';
 import Layout from '../components/Layout';
 import SequenceDiagram from '../components/SequenceDiagram';
-
-const protocolColors = {
-  TCP: 'var(--color-tcp)',
-  UDP: 'var(--color-udp)',
-  DNS: 'var(--color-dns)',
-  ICMP: 'var(--color-icmp)',
-};
+import { protocolColors } from '../constants/styles';
 
 function getProtocolColor(protocol) {
   return protocolColors[protocol] || 'var(--color-text-dim)';
@@ -30,13 +25,14 @@ function getProtocolColor(protocol) {
 function PacketCard({ packet }) {
   const [explanation, setExplanation] = useState(null);
   const [loadingExplain, setLoadingExplain] = useState(false);
+  const [showRawData, setShowRawData] = useState(false);
 
   const handleExplain = async () => {
     setLoadingExplain(true);
     try {
       const response = await api.post(`/packets/${packet.id}/explain/`);
       setExplanation(response.data.explanation);
-    } catch (err) {
+    } catch {
       setExplanation("Couldn't generate an explanation right now. Try again in a moment.");
     } finally {
       setLoadingExplain(false);
@@ -44,13 +40,14 @@ function PacketCard({ packet }) {
   };
 
   const color = getProtocolColor(packet.protocol);
+  const hasRawData = packet.raw_data && Object.keys(packet.raw_data).length > 0;
 
   return (
     <div
-      className="p-2.5 rounded-md border-l-4"
+      className="p-3.5 rounded-md border-l-4"
       style={{ backgroundColor: 'var(--color-bg)', borderLeftColor: color }}
     >
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-3 md:gap-4 whitespace-nowrap overflow-hidden">
         <span className="text-xs font-mono w-6 shrink-0" style={{ color: 'var(--color-text-dim)' }}>
           {packet.packet_number}
         </span>
@@ -66,13 +63,26 @@ function PacketCard({ packet }) {
           {packet.dest_ip}
         </span>
         {packet.flags && (
-          <span className="text-xs font-mono" style={{ color: 'var(--color-text-dim)' }}>
+          <span className="text-xs font-mono shrink-0" style={{ color: 'var(--color-text-dim)' }}>
             [{packet.flags}]
           </span>
         )}
-        <span className="text-sm truncate flex-1" style={{ color: 'var(--color-text-dim)' }}>
+        <span className="text-sm flex-1 min-w-0 truncate" style={{ color: 'var(--color-text-dim)' }}>
           {packet.summary}
         </span>
+        {hasRawData && (
+          <button
+            onClick={() => setShowRawData(!showRawData)}
+            className="flex items-center gap-1 text-xs px-2 py-1 rounded shrink-0 hover:opacity-80"
+            style={{
+              color: showRawData ? 'var(--color-accent)' : 'var(--color-text-dim)',
+              backgroundColor: showRawData ? 'rgba(52,211,153,0.1)' : 'transparent',
+            }}
+          >
+            <List size={11} />
+            Raw
+          </button>
+        )}
         <button
           onClick={handleExplain}
           disabled={loadingExplain}
@@ -88,32 +98,42 @@ function PacketCard({ packet }) {
         </button>
       </div>
 
+      {showRawData && hasRawData && (
+        <div
+          className="mt-3 p-3.5 rounded text-xs font-mono overflow-x-auto"
+          style={{ backgroundColor: 'rgba(52,211,153,0.04)', color: 'var(--color-text-dim)' }}
+        >
+          <pre className="whitespace-pre-wrap break-all m-0">{JSON.stringify(packet.raw_data, null, 2)}</pre>
+        </div>
+      )}
+
       {explanation && (
-  <div
-    className="flex items-start gap-2 mt-2 p-2.5 rounded text-sm"
-    style={{ backgroundColor: 'rgba(52,211,153,0.06)', color: 'var(--color-text)' }}
-  >
-    <Sparkles size={13} className="mt-0.5 shrink-0" style={{ color: 'var(--color-accent)' }} />
-    <span className="flex-1">{explanation}</span>
-    <button
-      onClick={() => setExplanation(null)}
-      className="shrink-0 hover:opacity-70"
-      style={{ color: 'var(--color-text-dim)' }}
-    >
-      <X size={14} />
-    </button>
-  </div>
-)}
+        <div
+          className="flex items-start gap-2 mt-3 p-3.5 rounded text-sm"
+          style={{ backgroundColor: 'rgba(52,211,153,0.06)', color: 'var(--color-text)' }}
+        >
+          <Sparkles size={13} className="mt-0.5 shrink-0" style={{ color: 'var(--color-accent)' }} />
+          <span className="flex-1">{explanation}</span>
+          <button
+            onClick={() => setExplanation(null)}
+            className="shrink-0 hover:opacity-70"
+            style={{ color: 'var(--color-text-dim)' }}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-function ChallengeBlock({ challenge }) {
+function ChallengeBlock({ challenge, challengeIndex, onCorrect }) {
   const [answer, setAnswer] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
   const [view, setView] = useState('cards');
   const [completed, setCompleted] = useState(challenge.is_completed);
+  const blockRef = useRef(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -125,9 +145,10 @@ function ChallengeBlock({ challenge }) {
       setResult(response.data);
       if (response.data.is_correct) {
         setCompleted(true);
+        if (onCorrect) onCorrect(challengeIndex);
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
+      console.error('Submit failed');
     } finally {
       setSubmitting(false);
     }
@@ -135,7 +156,9 @@ function ChallengeBlock({ challenge }) {
 
   return (
     <div
-      className="p-4 rounded-lg border mb-6"
+      ref={blockRef}
+      id={`challenge-${challenge.order}`}
+      className="p-5 rounded-lg border mb-8"
       style={{
         backgroundColor: 'var(--color-surface)',
         borderColor: completed ? 'var(--color-accent)' : 'var(--color-border)',
@@ -167,7 +190,7 @@ function ChallengeBlock({ challenge }) {
           </div>
 
           {view === 'cards' ? (
-            <div className="flex flex-col gap-2 mb-4">
+            <div className="flex flex-col gap-3 mb-4">
               {challenge.packets.map((packet) => (
                 <PacketCard key={packet.id} packet={packet} />
               ))}
@@ -180,7 +203,7 @@ function ChallengeBlock({ challenge }) {
         </>
       )}
 
-      <p className="text-sm font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--color-text)' }}>
+      <p className="text-sm font-medium mb-1 flex items-center gap-2" style={{ color: 'var(--color-text)' }}>
         <span style={{ color: 'var(--color-accent)' }} className="font-mono">
           Q{challenge.order}
         </span>
@@ -189,20 +212,23 @@ function ChallengeBlock({ challenge }) {
           <CheckCircle2 size={15} style={{ color: 'var(--color-accent)' }} className="shrink-0 ml-auto" />
         )}
       </p>
+      <p className="text-xs mb-4" style={{ color: 'var(--color-text-dim)' }}>
+        {challenge.packets.length} {challenge.packets.length === 1 ? 'packet' : 'packets'}
+      </p>
 
-      <form onSubmit={handleSubmit} className="flex gap-2">
+      <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
         <input
           type="text"
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}
           placeholder="Type your answer..."
-          className="flex-1 px-3 py-2 rounded-md text-sm outline-none border font-mono"
+          className="flex-1 px-4 py-2.5 rounded-md text-sm outline-none border font-mono"
           style={{ backgroundColor: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
         />
         <button
           type="submit"
           disabled={submitting}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium"
+          className="flex items-center gap-1.5 px-5 py-2.5 rounded-md text-sm font-medium"
           style={{ backgroundColor: 'var(--color-accent)', color: '#052E20' }}
         >
           {submitting ? <Loader2 size={14} className="animate-spin" /> : null}
@@ -212,7 +238,7 @@ function ChallengeBlock({ challenge }) {
 
       {result && (
         <div
-          className="flex items-start gap-2 mt-3 p-3 rounded-md text-sm"
+          className="flex items-start gap-2 mt-3 p-4 rounded-md text-sm"
           style={{
             backgroundColor: result.is_correct ? 'rgba(52,211,153,0.1)' : 'rgba(248,113,113,0.1)',
             color: result.is_correct ? '#34D399' : '#F87171',
@@ -226,6 +252,29 @@ function ChallengeBlock({ challenge }) {
           <span>{result.message}</span>
         </div>
       )}
+
+      {!completed && challenge.previous_attempts && challenge.previous_attempts.length > 0 && (
+        <div className="mt-3">
+          <p className="text-xs font-medium mb-1.5" style={{ color: 'var(--color-text-dim)' }}>
+            Previous attempts:
+          </p>
+          <div className="flex flex-col gap-1">
+            {challenge.previous_attempts.map((attempt) => (
+              <div
+                key={attempt.id}
+                className="flex items-center gap-2 text-xs px-2.5 py-1.5 rounded font-mono"
+                style={{
+                  backgroundColor: 'rgba(248,113,113,0.06)',
+                  color: 'var(--color-text-dim)',
+                }}
+              >
+                <XCircle size={11} className="shrink-0" style={{ color: '#F87171' }} />
+                <span className="line-through opacity-70">{attempt.answer_given}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -236,27 +285,74 @@ function LabDetail() {
   const [lab, setLab] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showResources, setShowResources] = useState(false);
+  const [userRating, setUserRating] = useState(null);
+  const [hoverRating, setHoverRating] = useState(null);
+  const [ratingSaved, setRatingSaved] = useState(false);
 
   useEffect(() => {
-    api.get(`/labs/${id}/`)
+    const controller = new AbortController();
+    api.get(`/labs/${id}/`, { signal: controller.signal })
       .then((res) => setLab(res.data))
-      .catch((err) => console.error(err))
+      .catch((err) => {
+        if (err.name !== 'CanceledError') console.error(err);
+      })
       .finally(() => setLoading(false));
+    return () => controller.abort();
   }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    api.get(`/labs/${id}/rating/`)
+      .then((res) => setUserRating(res.data.user_rating))
+      .catch(() => {});
+  }, [id]);
+
+  const handleRate = async (score) => {
+    try {
+      await api.post(`/labs/${id}/rate/`, { score });
+      setUserRating(score);
+      setRatingSaved(true);
+      setTimeout(() => setRatingSaved(false), 2000);
+    } catch {
+      console.error('Rating failed');
+    }
+  };
+
+  const handleCorrect = useCallback((challengeIndex) => {
+    // Auto-scroll to next challenge after a short delay
+    setTimeout(() => {
+      const nextIndex = challengeIndex + 1;
+      if (lab && nextIndex < lab.challenges.length) {
+        const nextChallenge = lab.challenges[nextIndex];
+        const el = document.getElementById(`challenge-${nextChallenge.order}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    }, 800);
+  }, [lab]);
 
   if (loading || !lab) {
     return (
       <Layout>
-        <div className="p-10" style={{ color: 'var(--color-text-dim)' }}>
-          {loading ? 'Loading lab...' : 'Lab not found.'}
+        <div className="p-4 md:p-10 flex items-center gap-2" style={{ color: 'var(--color-text-dim)' }}>
+          {loading ? (
+            <>
+              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              Loading lab...
+            </>
+          ) : 'Lab not found.'}
         </div>
       </Layout>
     );
   }
 
+  const completedCount = lab.challenges.filter((c) => c.is_completed).length;
+  const totalChallenges = lab.challenges.length;
+
   return (
     <Layout>
-      <div className="p-10 max-w-3xl">
+      <div className="p-4 md:p-10 max-w-6xl mx-auto">
         <button
           onClick={() => navigate('/labs')}
           className="flex items-center gap-1.5 text-sm mb-6 hover:opacity-80"
@@ -272,9 +368,25 @@ function LabDetail() {
         >
           {lab.title}
         </h1>
-        <p className="text-sm font-mono mb-6" style={{ color: 'var(--color-text-dim)' }}>
+        <p className="text-sm font-mono mb-2" style={{ color: 'var(--color-text-dim)' }}>
           {lab.topic} · {lab.difficulty}
         </p>
+
+        {/* Lab progress indicator */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="flex-1 h-1.5 rounded-full overflow-hidden max-w-[200px]" style={{ backgroundColor: 'var(--color-border)' }}>
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${totalChallenges > 0 ? (completedCount / totalChallenges) * 100 : 0}%`,
+                backgroundColor: 'var(--color-accent)',
+              }}
+            />
+          </div>
+          <span className="text-xs font-mono" style={{ color: completedCount === totalChallenges ? 'var(--color-accent)' : 'var(--color-text-dim)' }}>
+            {completedCount}/{totalChallenges} challenges completed
+          </span>
+        </div>
 
         {lab.resources?.length > 0 && (
           <div className="mb-8">
@@ -284,14 +396,13 @@ function LabDetail() {
               style={{ color: 'var(--color-accent)' }}
             >
               <ExternalLink size={14} />
-              {showResources ? 'Hide resources' : 'Need a refresher?'}
+              {showResources ? 'Hide resources' : 'View resources'}
             </button>
             {showResources && (
               <ul className="mt-2 flex flex-col gap-1">
                 {lab.resources.map((res, i) => (
                   <li key={i}>
                     <a
-                    
                       href={res.url}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -308,10 +419,51 @@ function LabDetail() {
         )}
 
         <div>
-          {lab.challenges.map((challenge) => (
-            <ChallengeBlock key={challenge.id} challenge={challenge} />
+          {lab.challenges.map((challenge, index) => (
+            <ChallengeBlock
+              key={challenge.id}
+              challenge={challenge}
+              challengeIndex={index}
+              onCorrect={handleCorrect}
+            />
           ))}
         </div>
+
+        {completedCount === totalChallenges && totalChallenges > 0 && (
+          <div
+            className="mt-8 p-6 rounded-lg border text-center"
+            style={{
+              backgroundColor: 'var(--color-surface)',
+              borderColor: 'var(--color-accent)',
+            }}
+          >
+            <CheckCircle2 size={32} className="mx-auto mb-2" style={{ color: 'var(--color-accent)' }} />
+            <p className="text-sm font-medium mb-4" style={{ color: 'var(--color-text)' }}>
+              You completed all challenges! Rate this lab:
+            </p>
+            <div className="flex justify-center gap-1 mb-3">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  onClick={() => handleRate(star)}
+                  onMouseEnter={() => setHoverRating(star)}
+                  onMouseLeave={() => setHoverRating(null)}
+                  className="p-1 transition-opacity hover:opacity-100"
+                  style={{ opacity: (hoverRating || userRating) && star <= (hoverRating || userRating) ? 1 : 0.3 }}
+                >
+                  <Star
+                    size={28}
+                    fill={star <= (hoverRating || userRating) ? '#FBBF24' : 'transparent'}
+                    stroke={star <= (hoverRating || userRating) ? '#FBBF24' : 'var(--color-text-dim)'}
+                  />
+                </button>
+              ))}
+            </div>
+            {ratingSaved && (
+              <p className="text-xs" style={{ color: 'var(--color-accent)' }}>Rating saved!</p>
+            )}
+          </div>
+        )}
       </div>
     </Layout>
   );

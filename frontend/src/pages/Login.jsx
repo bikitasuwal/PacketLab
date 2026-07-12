@@ -7,18 +7,23 @@ function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
     try {
       const response = await api.post('/auth/login/', { username, password });
       localStorage.setItem('access_token', response.data.access);
       localStorage.setItem('refresh_token', response.data.refresh);
+      localStorage.setItem('username', response.data.username);
       navigate('/dashboard');
-    } catch (err) {
+    } catch {
       setError('Invalid username or password.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -59,6 +64,7 @@ function Login() {
           type="text"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
+          required
           className="w-full mb-4 px-3 py-2 rounded-md text-sm outline-none border font-mono"
           style={{ backgroundColor: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
         />
@@ -70,17 +76,19 @@ function Login() {
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          required
           className="w-full mb-6 px-3 py-2 rounded-md text-sm outline-none border font-mono"
           style={{ backgroundColor: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
         />
 
         <button
           type="submit"
-          className="w-full flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium"
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium disabled:opacity-60"
           style={{ backgroundColor: 'var(--color-accent)', color: '#052E20' }}
         >
           <LogIn size={15} />
-          Log in
+          {loading ? 'Logging in...' : 'Log in'}
         </button>
 
         <p className="text-xs text-center mt-4" style={{ color: 'var(--color-text-dim)' }}>

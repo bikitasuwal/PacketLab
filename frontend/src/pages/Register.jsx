@@ -22,6 +22,7 @@ function Register() {
       const loginResponse = await api.post('/auth/login/', { username, password });
       localStorage.setItem('access_token', loginResponse.data.access);
       localStorage.setItem('refresh_token', loginResponse.data.refresh);
+      localStorage.setItem('username', loginResponse.data.username);
       navigate('/dashboard');
     } catch (err) {
       const message = err.response?.data?.error || 'Could not create account. Try a different username.';
