@@ -6,6 +6,8 @@ import api from '../api/axios';
 function Register() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,7 +19,10 @@ function Register() {
     setLoading(true);
 
     try {
-      await api.post('/auth/register/', { username, email, password });
+      await api.post('/auth/register/', {
+        username, email, password,
+        first_name: firstName, last_name: lastName
+      });
 
       const loginResponse = await api.post('/auth/login/', { username, password });
       localStorage.setItem('access_token', loginResponse.data.access);
@@ -82,6 +87,28 @@ function Register() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
+          className="w-full mb-4 px-3 py-2 rounded-md text-sm outline-none border font-mono"
+          style={{ backgroundColor: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
+        />
+
+        <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--color-text-dim)' }}>
+          First Name
+        </label>
+        <input
+          type="text"
+          value={firstName}
+          onChange={(e) => setFirstName(e.target.value)}
+          className="w-full mb-4 px-3 py-2 rounded-md text-sm outline-none border font-mono"
+          style={{ backgroundColor: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
+        />
+
+        <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--color-text-dim)' }}>
+          Last Name
+        </label>
+        <input
+          type="text"
+          value={lastName}
+          onChange={(e) => setLastName(e.target.value)}
           className="w-full mb-4 px-3 py-2 rounded-md text-sm outline-none border font-mono"
           style={{ backgroundColor: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
         />
