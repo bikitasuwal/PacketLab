@@ -87,10 +87,9 @@ function Register() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="w-full px-3 py-2 rounded-md text-sm outline-none border font-mono"
+          className="w-full mb-4 px-3 py-2 rounded-md text-sm outline-none border font-mono"
           style={{ backgroundColor: 'var(--color-bg)', borderColor: 'var(--color-border)', color: 'var(--color-text)' }}
         />
-        <p className="text-xs mb-4" style={{ color: 'var(--color-text-dim)' }}>e.g. user@example.com</p>
 
         <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--color-text-dim)' }}>
           First Name
