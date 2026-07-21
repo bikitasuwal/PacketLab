@@ -33,8 +33,9 @@ class Command(BaseCommand):
                         question=item['question'],
                         correct_answer=item['correct_answer'],
                     )
+                    packet_nums = [int(n) for n in item.get('relevant_packet_numbers', []) if str(n).isdigit()]
                     Packet.objects.filter(
-                        lab=lab, packet_number__in=item.get('relevant_packet_numbers', [])
+                        lab=lab, packet_number__in=packet_nums
                     ).update(challenge=challenge)
                 self.stdout.write(self.style.SUCCESS(f'  Created {len(generated)} challenges'))
                 count += 1
