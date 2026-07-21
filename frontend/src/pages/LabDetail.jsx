@@ -41,6 +41,9 @@ function PacketCard({ packet }) {
 
   const color = getProtocolColor(packet.protocol);
   const hasRawData = packet.raw_data && Object.keys(packet.raw_data).length > 0;
+  const dnsData = packet.raw_data?.dns;
+  const tcpData = packet.raw_data?.tcp;
+  const udpData = packet.raw_data?.udp;
 
   return (
     <div
@@ -97,6 +100,39 @@ function PacketCard({ packet }) {
           {loadingExplain ? 'Thinking...' : 'Explain'}
         </button>
       </div>
+
+      {/* Detail line: DNS / TCP / UDP specifics */}
+      {(dnsData || tcpData || udpData) && (
+        <div className="flex flex-wrap items-center gap-2 mt-2 pl-9">
+          {dnsData && (
+            <>
+              {dnsData.query_type && (
+                <span className="text-xs font-mono px-1.5 py-0.5 rounded" style={{ color: 'var(--color-accent)', backgroundColor: 'rgba(52,211,153,0.1)' }}>
+                  {dnsData.query_type}
+                </span>
+              )}
+              {dnsData.response_code !== undefined && (
+                <span className="text-xs font-mono px-1.5 py-0.5 rounded" style={{
+                  color: dnsData.response_code === 0 ? '#34D399' : '#F87171',
+                  backgroundColor: dnsData.response_code === 0 ? 'rgba(52,211,153,0.1)' : 'rgba(248,113,113,0.1)',
+                }}>
+                  rcode={dnsData.response_code} {dnsData.rcode_name}
+                </span>
+              )}
+              {dnsData.answers && (
+                <span className="text-xs font-mono" style={{ color: 'var(--color-text-dim)' }}>
+                  answers: {dnsData.answers.join(', ')}
+                </span>
+              )}
+            </>
+          )}
+          {(tcpData || udpData) && (
+            <span className="text-xs font-mono" style={{ color: 'var(--color-text-dim)' }}>
+              port {tcpData?.sport || udpData?.sport} → {tcpData?.dport || udpData?.dport}
+            </span>
+          )}
+        </div>
+      )}
 
       {showRawData && hasRawData && (
         <div

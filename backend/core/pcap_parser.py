@@ -161,6 +161,32 @@ def parse_pcap_to_packets(pcap_file_path):
         elif pkt.haslayer(UDP):
             raw_data['udp'] = {'sport': pkt[UDP].sport, 'dport': pkt[UDP].dport}
 
+        if pkt.haslayer(DNS):
+            dns = pkt[DNS]
+            dns_info = {}
+            qtypes = {1: 'A', 28: 'AAAA', 5: 'CNAME', 15: 'MX', 16: 'TXT', 12: 'PTR', 2: 'NS', 255: 'ANY', 33: 'SRV', 6: 'SOA'}
+            if dns.qd:
+                qname = dns.qd.qname.decode().rstrip('.') if isinstance(dns.qd.qname, bytes) else str(dns.qd.qname)
+                dns_info['query_name'] = qname
+                dns_info['query_type'] = qtypes.get(dns.qd.qtype, str(dns.qd.qtype))
+            dns_info['response_code'] = dns.rcode
+            rcode_names = {0: 'No Error', 1: 'Format Error', 2: 'Server Failure', 3: 'NXDOMAIN', 4: 'Not Implemented', 5: 'Query Refused'}
+            dns_info['rcode_name'] = rcode_names.get(dns.rcode, str(dns.rcode))
+            if dns.an:
+                answers = []
+                rr = dns.an
+                while rr:
+                    try:
+                        if hasattr(rr, 'rdata'):
+                            answers.append(str(rr.rdata))
+                        rr = rr[1] if rr[1].haslayer(DNS) else None
+                    except (IndexError, AttributeError):
+                        break
+                if answers:
+                    dns_info['answers'] = answers
+            dns_info['is_response'] = dns.qr == 1
+            raw_data['dns'] = dns_info
+
         parsed.append({
             'packet_number': len(parsed) + 1,
             'source_ip': source_ip,
