@@ -44,7 +44,7 @@ def generate_challenges_for_lab(lab):
     else:
         packet_list = list(packets)
 
-    num_challenges = min(8, max(5, len(packet_list) // 3))
+    num_challenges = 5
 
     packet_summaries = []
     for p in packet_list:
