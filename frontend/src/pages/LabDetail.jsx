@@ -169,6 +169,11 @@ function ChallengeBlock({ challenge, challengeIndex, onCorrect }) {
   const [result, setResult] = useState(null);
   const [view, setView] = useState('cards');
   const [completed, setCompleted] = useState(challenge.is_completed);
+  const [wrongCount, setWrongCount] = useState(
+    challenge.previous_attempts ? challenge.previous_attempts.length : 0
+  );
+  const [revealed, setRevealed] = useState(false);
+  const [revealedAnswer, setRevealedAnswer] = useState('');
   const blockRef = useRef(null);
 
   const handleSubmit = async (e) => {
@@ -182,6 +187,11 @@ function ChallengeBlock({ challenge, challengeIndex, onCorrect }) {
       if (response.data.is_correct) {
         setCompleted(true);
         if (onCorrect) onCorrect(challengeIndex);
+      } else {
+        setWrongCount((prev) => prev + 1);
+        if (response.data.show_answer) {
+          setRevealedAnswer(response.data.correct_answer);
+        }
       }
     } catch {
       console.error('Submit failed');
@@ -309,6 +319,29 @@ function ChallengeBlock({ challenge, challengeIndex, onCorrect }) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {!completed && !revealed && wrongCount >= 3 && revealedAnswer && (
+        <div className="mt-3">
+          <button
+            onClick={() => setRevealed(true)}
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md hover:opacity-80"
+            style={{ color: '#FBBF24', backgroundColor: 'rgba(251,191,36,0.1)' }}
+          >
+            <Sparkles size={12} />
+            Show Answer
+          </button>
+        </div>
+      )}
+
+      {revealed && revealedAnswer && (
+        <div
+          className="flex items-start gap-2 mt-3 p-4 rounded-md text-sm"
+          style={{ backgroundColor: 'rgba(251,191,36,0.1)', color: '#FBBF24' }}
+        >
+          <Sparkles size={16} className="mt-0.5 shrink-0" />
+          <span>The correct answer is: <strong className="font-mono">{revealedAnswer}</strong></span>
         </div>
       )}
     </div>

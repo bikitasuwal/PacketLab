@@ -156,6 +156,16 @@ def submit_answer_view(request, pk):
         ai_explanation=''
     )
 
+    # Count total wrong attempts for this challenge
+    wrong_attempts = Attempt.objects.filter(
+        student=request.user, challenge=challenge, is_correct=False
+    ).count()
+
+    response_data = {
+        'is_correct': is_correct,
+        'message': 'Correct! Well done.' if is_correct else 'Not quite. Try again!',
+    }
+
     if is_correct:
         correct_challenge_ids_after = correct_challenge_ids_before | {challenge.id}
         is_complete_now = correct_challenge_ids_after >= set(lab.challenges.values_list('id', flat=True))
@@ -163,11 +173,11 @@ def submit_answer_view(request, pk):
         if is_complete_now and not was_complete_before:
             progress.labs_completed += 1
             progress.save()
+    elif wrong_attempts >= 3:
+        response_data['show_answer'] = True
+        response_data['correct_answer'] = challenge.correct_answer
 
-    return Response({
-        'is_correct': is_correct,
-        'message': 'Correct! Well done.' if is_correct else 'Not quite. Try again!'
-    })
+    return Response(response_data)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
